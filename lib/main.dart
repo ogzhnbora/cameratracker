@@ -183,7 +183,6 @@ class AnaSayfa extends StatelessWidget {
         child: RichText(
           textAlign: TextAlign.center,
           text: TextSpan(
-            
             style: TextStyle(color: Colors.black),
             children: <TextSpan>[
               TextSpan(
@@ -193,7 +192,6 @@ class AnaSayfa extends StatelessWidget {
                   fontSize: 20.0,
                 ),
               ),
-              
             ],
           ),
         ),
@@ -201,4 +199,3 @@ class AnaSayfa extends StatelessWidget {
     );
   }
 }
-
