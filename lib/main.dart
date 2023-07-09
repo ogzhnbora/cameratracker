@@ -1,8 +1,44 @@
 import 'package:flutter/material.dart';
-import 'listeler.dart';
+
+import 'package:grpc/grpc.dart';
+
+import 'ivssapi.pbgrpc.dart';
 
 void main() {
-  runApp(MyApp());
+  void main() async {
+    final channel = ClientChannel(
+      '10.5.5.0',
+      port: 28289,
+      options: ChannelOptions(credentials: ChannelCredentials.insecure()),
+    );
+    final client = IvssApiServerClient(channel);
+
+    try {
+      final request = GetCameraListReq();
+      final response = await client.getCameraList(request);
+
+      List<Bilgi> bilgiler = [];
+
+      for (var camera in response.camlist) {
+        final cameraInfo = camera.info;
+        final bilgi = Bilgi(cameraInfo.name, cameraInfo.toString());
+        bilgiler.add(bilgi);
+      }
+
+      runApp(MyApp(bilgiler: bilgiler));
+    } catch (e) {
+      print('İstek gönderme hatası: $e');
+    } finally {
+      await channel.shutdown();
+    }
+  }
+}
+
+class Bilgi {
+  final String baslik;
+  final String aciklama;
+
+  Bilgi(this.baslik, this.aciklama);
 }
 
 class DetaySayfasi extends StatelessWidget {
@@ -25,6 +61,10 @@ class DetaySayfasi extends StatelessWidget {
 }
 
 class MyApp extends StatelessWidget {
+  final List<Bilgi> bilgiler;
+
+  MyApp({required this.bilgiler});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -34,9 +74,11 @@ class MyApp extends StatelessWidget {
       onGenerateRoute: (RouteSettings settings) {
         switch (settings.name) {
           case '/':
-            return MaterialPageRoute(builder: (_) => AnaSayfa());
+            return MaterialPageRoute(
+                builder: (_) => AnaSayfa(bilgiler: bilgiler));
           case '/kameralar':
-            return MaterialPageRoute(builder: (_) => KameralarSayfasi());
+            return MaterialPageRoute(
+                builder: (_) => KameralarSayfasi(bilgiler: bilgiler));
           case '/ayarlar':
             return MaterialPageRoute(builder: (_) => AyarlarSayfasi());
           default:
@@ -117,7 +159,10 @@ class Menu {
 }
 
 class KameralarSayfasi extends StatelessWidget {
+  final List<Bilgi> bilgiler;
   final double fontSize = 18.0;
+
+  KameralarSayfasi({required this.bilgiler});
 
   @override
   Widget build(BuildContext context) {
@@ -172,6 +217,10 @@ class AyarlarSayfasi extends StatelessWidget {
 }
 
 class AnaSayfa extends StatelessWidget {
+  final List<Bilgi> bilgiler;
+
+  AnaSayfa({required this.bilgiler});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
