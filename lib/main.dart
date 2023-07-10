@@ -1,44 +1,61 @@
 import 'package:flutter/material.dart';
-
 import 'package:grpc/grpc.dart';
-
 import 'ivssapi.pbgrpc.dart';
 
-void main() {
-  void main() async {
-    final channel = ClientChannel(
-      '10.5.5.0',
-      port: 28289,
-      options: ChannelOptions(credentials: ChannelCredentials.insecure()),
-    );
-    final client = IvssApiServerClient(channel);
+void main() async {
+  final channel = ClientChannel(
+    '10.5.5.0',
+    port: 28289,
+    options: ChannelOptions(credentials: ChannelCredentials.insecure()),
+  );
+  final client = IvssApiServerClient(channel);
 
-    try {
-      final request = GetCameraListReq();
-      final response = await client.getCameraList(request);
+  try {
+    final request = GetCameraListReq();
+    final response = await client.getCameraList(request);
 
-      List<Bilgi> bilgiler = [];
+    List<Bilgi> bilgiler = [];
 
-      for (var camera in response.camlist) {
-        final cameraInfo = camera.info;
-        final bilgi = Bilgi(cameraInfo.name, cameraInfo.toString());
-        bilgiler.add(bilgi);
-      }
+    for (var camera in response.camlist) {
+      final cameraInfo = camera.info;
+      final streamInfo = camera.streamSettings.streams.first;
 
-      runApp(MyApp(bilgiler: bilgiler));
-    } catch (e) {
-      print('İstek gönderme hatası: $e');
-    } finally {
-      await channel.shutdown();
+      final staticUrls = camera.streamSettings.staticUrl.url;
+      final staticUrlList =
+          staticUrls.isNotEmpty ? staticUrls : [streamInfo.url];
+
+      final bilgi = Bilgi(
+        cameraInfo.name,
+        cameraInfo.location,
+        cameraInfo.gateway,
+        cameraInfo.group,
+        cameraInfo.name,
+        streamInfo.streamID,
+        staticUrlList,
+      );
+
+      bilgiler.add(bilgi);
     }
+
+    runApp(MyApp(bilgiler: bilgiler));
+  } catch (e) {
+    print('İstek gönderme hatası: $e');
+  } finally {
+    await channel.shutdown();
   }
 }
 
 class Bilgi {
   final String baslik;
-  final String aciklama;
+  final String location;
+  final String gateway;
+  final String group;
+  final String name;
+  final String streamID;
+  final List<String> staticUrls;
 
-  Bilgi(this.baslik, this.aciklama);
+  Bilgi(this.baslik, this.location, this.gateway, this.group, this.name,
+      this.streamID, this.staticUrls);
 }
 
 class DetaySayfasi extends StatelessWidget {
@@ -54,7 +71,54 @@ class DetaySayfasi extends StatelessWidget {
       ),
       body: Padding(
         padding: EdgeInsets.all(20.0),
-        child: Text(bilgi.aciklama),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'ID:',
+              style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              'Name: ${bilgi.name}',
+              style: TextStyle(fontSize: 18.0),
+            ),
+            SizedBox(height: 10.0),
+            Text(
+              'Location: ${bilgi.location}',
+              style: TextStyle(fontSize: 18.0),
+            ),
+            SizedBox(height: 10.0),
+            Text(
+              'Gateway: ${bilgi.gateway}',
+              style: TextStyle(fontSize: 18.0),
+            ),
+            SizedBox(height: 10.0),
+            Text(
+              'Group: ${bilgi.group}',
+              style: TextStyle(fontSize: 18.0),
+            ),
+            SizedBox(height: 10.0),
+            Text(
+              'Stream Infos:',
+              style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10.0),
+            Text(
+              'StreamID: ${bilgi.streamID}',
+              style: TextStyle(fontSize: 18.0),
+            ),
+            SizedBox(height: 10.0),
+            Text(
+              'Static URL:',
+              style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+            ),
+            for (var url in bilgi.staticUrls)
+              Text(
+                url,
+                style: TextStyle(fontSize: 18.0),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -69,7 +133,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sparse Technology',
-      theme: ThemeData(primarySwatch: Colors.deepOrange),
+      theme: ThemeData(primarySwatch: Colors.red),
       initialRoute: '/',
       onGenerateRoute: (RouteSettings settings) {
         switch (settings.name) {
@@ -112,7 +176,7 @@ class Menu {
             title: Padding(
               padding: EdgeInsets.only(top: 8.0, bottom: 8.0),
               child: Text(
-                'Ana Sayfa',
+                'Home Page',
                 style: TextStyle(fontSize: 16.0),
               ),
             ),
@@ -128,7 +192,7 @@ class Menu {
             title: Padding(
               padding: EdgeInsets.only(top: 8.0, bottom: 8.0),
               child: Text(
-                'Kameralar',
+                'Cameras',
                 style: TextStyle(fontSize: 16.0),
               ),
             ),
@@ -144,7 +208,7 @@ class Menu {
             title: Padding(
               padding: EdgeInsets.only(top: 8.0, bottom: 8.0),
               child: Text(
-                'Ayarlar',
+                'Settings',
                 style: TextStyle(fontSize: 16.0),
               ),
             ),
@@ -168,7 +232,7 @@ class KameralarSayfasi extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Kameralar'),
+        title: Text('Cameras'),
       ),
       drawer: Menu.build(context),
       body: ListView.builder(
@@ -206,7 +270,7 @@ class AyarlarSayfasi extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Ayarlar'),
+        title: Text('Settings'),
       ),
       drawer: Menu.build(context),
       body: Center(
@@ -225,7 +289,7 @@ class AnaSayfa extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Ana Sayfa'),
+        title: Text('Home Page'),
       ),
       drawer: Menu.build(context),
       body: Center(
