@@ -153,13 +153,32 @@ class Bilgi {
         analyticsStatus = 'UNKNOWN';
 }
 
-class DetaySayfasi extends StatelessWidget {
+class DetaySayfasi extends StatefulWidget {
   final Bilgi bilgi;
 
   DetaySayfasi({required this.bilgi});
 
   @override
+  DetaySayfasiState createState() => DetaySayfasiState();
+}
+
+class DetaySayfasiState extends State<DetaySayfasi> {
+  String searchText = '';
+
+  List<String> filterList(List<String> items) {
+    return items
+        .where((item) => item.toLowerCase().contains(searchText.toLowerCase()))
+        .toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final bilgi = widget.bilgi;
+
+    final filteredReasons = filterList(bilgi.reasons);
+    final filteredAnalyticReasons = filterList(bilgi.analyticreasons);
+    final filteredRecordReasons = filterList(bilgi.recordreasons);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(bilgi.baslik),
@@ -237,14 +256,12 @@ class DetaySayfasi extends StatelessWidget {
                 ),
               ),
               Text(
+                'Health: % ${bilgi.point * 100}',
                 style: TextStyle(
                   fontSize: 18.0,
                 ),
-                'Health: % ${bilgi.point * 100}',
               ),
-              if (bilgi.status == 'Warning' ||
-                  bilgi.status == 'Critical' ||
-                  bilgi.status == 'Unknown')
+              if (filteredReasons.isNotEmpty)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -256,19 +273,13 @@ class DetaySayfasi extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    for (var reason in bilgi.reasons)
+                    for (var reason in filteredReasons)
                       Text(
                         reason,
                         style: TextStyle(fontSize: 18.0),
                       ),
                   ],
                 ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(height: 10.0),
-                ],
-              ),
               SizedBox(height: 10.0),
               Text(
                 'Record Status: ${bilgi.recordStatus}',
@@ -278,14 +289,12 @@ class DetaySayfasi extends StatelessWidget {
                 ),
               ),
               Text(
+                'Health:  % ${bilgi.recordpoint * 100}',
                 style: TextStyle(
                   fontSize: 18.0,
                 ),
-                'Health:  % ${bilgi.recordpoint * 100}',
               ),
-              if (bilgi.recordStatus == 'Warning' ||
-                  bilgi.recordStatus == 'Critical' ||
-                  bilgi.recordStatus == 'Unknown')
+              if (filteredRecordReasons.isNotEmpty)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -297,7 +306,7 @@ class DetaySayfasi extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    for (var reason in bilgi.recordreasons)
+                    for (var reason in filteredRecordReasons)
                       Text(
                         reason,
                         style: TextStyle(fontSize: 18.0),
@@ -313,14 +322,12 @@ class DetaySayfasi extends StatelessWidget {
                 ),
               ),
               Text(
+                'Health: %${bilgi.analyticpoint * 100}',
                 style: TextStyle(
                   fontSize: 18.0,
                 ),
-                'Health: %${bilgi.analyticpoint * 100}',
               ),
-              if (bilgi.analyticsStatus == 'Warning' ||
-                  bilgi.analyticsStatus == 'Critical' ||
-                  bilgi.analyticsStatus == 'Unknown')
+              if (filteredAnalyticReasons.isNotEmpty)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -332,7 +339,7 @@ class DetaySayfasi extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    for (var reason in bilgi.analyticreasons)
+                    for (var reason in filteredAnalyticReasons)
                       Text(
                         reason,
                         style: TextStyle(fontSize: 18.0),
@@ -356,7 +363,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sparse Technology',
-      theme: ThemeData(primarySwatch: Colors.red),
+      theme: ThemeData(primarySwatch: Colors.deepPurple),
       initialRoute: '/',
       onGenerateRoute: (RouteSettings settings) {
         switch (settings.name) {
@@ -451,11 +458,11 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
   IconData getStatusIcon(String status) {
     switch (status) {
       case 'Passing':
-        return Icons.battery_full; // Yeşil pil ikonu
+        return Icons.check_circle;
       case 'Critical':
-        return Icons.battery_alert; // Kırmızı pil ikonu
+        return Icons.error;
       default:
-        return Icons.warning; // Ünlem işareti ikonu
+        return Icons.help_outline;
     }
   }
 
@@ -466,13 +473,15 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
   }
 
   DateTime? lastRefreshTime;
+  bool isSearching = false;
+
   @override
   void initState() {
     super.initState();
     filteredBilgiler = List.from(widget.bilgiler);
   }
 
-  void _refreshCameras(BuildContext context) async {
+  Future<void> _refreshCameras() async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Cameras refreshed')),
     );
@@ -580,91 +589,128 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
     }
   }
 
+  void _toggleSearch() {
+    setState(() {
+      isSearching = !isSearching;
+      if (!isSearching) {
+        searchController.clear();
+        filteredBilgiler = List.from(widget.bilgiler);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final List<Bilgi> bilgiler = widget.bilgiler;
+    final List<Bilgi> bilgiler = filteredBilgiler;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Cameras'),
+        title: isSearching
+            ? TextField(
+                controller: searchController,
+                onChanged: (value) {
+                  setState(() {
+                    searchText = value;
+                    filteredBilgiler = bilgiler
+                        .where((bilgi) => bilgi.name
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()))
+                        .toList();
+                  });
+                },
+                autofocus: true,
+                style: TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Search',
+                  hintStyle: TextStyle(color: Colors.white54),
+                  border: InputBorder.none,
+                ),
+              )
+            : Text('Cameras'),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: () => _refreshCameras(context),
+            icon: Icon(Icons.search),
+            onPressed: _toggleSearch,
           ),
         ],
       ),
       drawer: Menu.build(context),
-      body: Column(
-        children: [
-          TextField(
-            controller: searchController,
-            onChanged: (value) {
-              setState(() {
-                searchText = value;
-                filteredBilgiler = bilgiler
-                    .where((bilgi) => bilgi.name
-                        .toLowerCase()
-                        .contains(searchText.toLowerCase()))
-                    .toList();
-              });
-            },
-            decoration: InputDecoration(
-              labelText: 'Search',
-              prefixIcon: Icon(Icons.search),
+      body: RefreshIndicator(
+        onRefresh: _refreshCameras,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(10.0),
+              child: Text(
+                'Last Refreshed: ${DateFormat('HH:mm:ss   dd/MM/yyyy ').format(lastRefreshTime ?? DateTime.now())}',
+                style: TextStyle(fontSize: 18.0),
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: Text(
-              'Last Refreshed: ${DateFormat('HH:mm:ss   dd/MM/yyyy ').format(DateTime.now())}',
-              style: TextStyle(fontSize: 18.0),
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: filteredBilgiler.length,
-              itemBuilder: (BuildContext context, int index) {
-                final bilgi = filteredBilgiler[index];
+            Expanded(
+              child: ListView.builder(
+                itemCount: filteredBilgiler.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final bilgi = filteredBilgiler[index];
 
-                final statusIcon = getStatusIcon(bilgi.status);
+                  final statusIcon = getStatusIcon(bilgi.status);
 
-                return Column(
-                  children: [
-                    ListTile(
-                      leading: Icon(getCameraIcon()),
-                      title: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              bilgi.baslik,
-                              style: TextStyle(fontSize: 18.0),
+                  final isMatched = bilgi.name
+                          .toLowerCase()
+                          .contains(searchText.toLowerCase()) ||
+                      bilgi.cameraName
+                          .toLowerCase()
+                          .contains(searchText.toLowerCase()) ||
+                      bilgi.location
+                          .toLowerCase()
+                          .contains(searchText.toLowerCase()) ||
+                      bilgi.gateway
+                          .toLowerCase()
+                          .contains(searchText.toLowerCase()) ||
+                      bilgi.group
+                          .toLowerCase()
+                          .contains(searchText.toLowerCase());
+
+                  if (!isMatched) {
+                    return SizedBox(); // Arama kriterlerine uymayan öğeleri gösterme
+                  }
+
+                  return Column(
+                    children: [
+                      ListTile(
+                        leading: Icon(getCameraIcon()),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                bilgi.baslik,
+                                style: TextStyle(fontSize: 18.0),
+                              ),
                             ),
-                          ),
-                          Icon(
-                            statusIcon,
-                            color: getStatusColor(bilgi.status),
-                            size: 28.0,
-                          ),
-                        ],
+                            Icon(
+                              statusIcon,
+                              color: getStatusColor(bilgi.status),
+                              size: 28.0,
+                            ),
+                          ],
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DetaySayfasi(bilgi: bilgi),
+                            ),
+                          );
+                        },
                       ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => DetaySayfasi(bilgi: bilgi),
-                          ),
-                        );
-                      },
-                    ),
-                    Divider(),
-                  ],
-                );
-              },
+                      Divider(),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
