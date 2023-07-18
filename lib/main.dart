@@ -474,6 +474,7 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
 
   DateTime? lastRefreshTime;
   bool isSearching = false;
+  bool isRefreshing = false;
 
   @override
   void initState() {
@@ -482,6 +483,10 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
   }
 
   Future<void> _refreshCameras() async {
+    setState(() {
+      isRefreshing = true;
+    });
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Cameras refreshed')),
     );
@@ -579,19 +584,21 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
 
       setState(() {
         lastRefreshTime = DateTime.now(); // Update the last refresh time
-        widget.bilgiler.clear();
-        widget.bilgiler.addAll(updatedBilgilerList);
       });
     } catch (e) {
       print('İstek gönderme hatasi: $e');
     } finally {
-      channel!.shutdown();
+      channel?.shutdown();
+      setState(() {
+        isRefreshing = false;
+      });
     }
   }
 
   void _toggleSearch() {
     setState(() {
       isSearching = !isSearching;
+
       if (!isSearching) {
         searchController.clear();
         filteredBilgiler = List.from(widget.bilgiler);
@@ -599,10 +606,32 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
     });
   }
 
+  void filterItems() {
+    setState(() {
+      filteredBilgiler = widget.bilgiler
+          .where((bilgi) =>
+              bilgi.name.toLowerCase().contains(searchText.toLowerCase()) ||
+              bilgi.cameraName
+                  .toLowerCase()
+                  .contains(searchText.toLowerCase()) ||
+              bilgi.location.toLowerCase().contains(searchText.toLowerCase()) ||
+              bilgi.gateway.toLowerCase().contains(searchText.toLowerCase()) ||
+              bilgi.group.toLowerCase().contains(searchText.toLowerCase()) ||
+              bilgi.uuid.toLowerCase().contains(searchText.toLowerCase()) ||
+              bilgi.cameraID.toLowerCase().contains(searchText.toLowerCase()) ||
+              bilgi.streamID.toLowerCase().contains(searchText.toLowerCase()) ||
+              bilgi.staticUrlList.toList().contains(searchText.toLowerCase()) ||
+              bilgi.status.toLowerCase().contains(searchText.toLowerCase()) ||
+              bilgi.recordStatus
+                  .toLowerCase()
+                  .contains(searchText.toLowerCase()) ||
+              bilgi.analyticsStatus.contains(searchText.toLowerCase()))
+          .toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final List<Bilgi> bilgiler = filteredBilgiler;
-
     return Scaffold(
       appBar: AppBar(
         title: isSearching
@@ -611,11 +640,7 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
                 onChanged: (value) {
                   setState(() {
                     searchText = value;
-                    filteredBilgiler = bilgiler
-                        .where((bilgi) => bilgi.name
-                            .toLowerCase()
-                            .contains(searchText.toLowerCase()))
-                        .toList();
+                    filterItems();
                   });
                 },
                 autofocus: true,
@@ -646,69 +671,95 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
                 style: TextStyle(fontSize: 18.0),
               ),
             ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: filteredBilgiler.length,
-                itemBuilder: (BuildContext context, int index) {
-                  final bilgi = filteredBilgiler[index];
-
-                  final statusIcon = getStatusIcon(bilgi.status);
-
-                  final isMatched = bilgi.name
-                          .toLowerCase()
-                          .contains(searchText.toLowerCase()) ||
-                      bilgi.cameraName
-                          .toLowerCase()
-                          .contains(searchText.toLowerCase()) ||
-                      bilgi.location
-                          .toLowerCase()
-                          .contains(searchText.toLowerCase()) ||
-                      bilgi.gateway
-                          .toLowerCase()
-                          .contains(searchText.toLowerCase()) ||
-                      bilgi.group
-                          .toLowerCase()
-                          .contains(searchText.toLowerCase());
-
-                  if (!isMatched) {
-                    return SizedBox(); // Arama kriterlerine uymayan öğeleri gösterme
-                  }
-
-                  return Column(
-                    children: [
-                      ListTile(
-                        leading: Icon(getCameraIcon()),
-                        title: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                bilgi.baslik,
-                                style: TextStyle(fontSize: 18.0),
-                              ),
-                            ),
-                            Icon(
-                              statusIcon,
-                              color: getStatusColor(bilgi.status),
-                              size: 28.0,
-                            ),
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => DetaySayfasi(bilgi: bilgi),
-                            ),
-                          );
-                        },
-                      ),
-                      Divider(),
-                    ],
-                  );
-                },
+            if (isRefreshing) // Show a loading indicator if cameras are being refreshed
+              Expanded(
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
               ),
-            ),
+            if (!isRefreshing)
+              Expanded(
+                child: ListView.builder(
+                  itemCount: filteredBilgiler.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final bilgi = filteredBilgiler[index];
+
+                    final statusIcon = getStatusIcon(bilgi.status);
+
+                    final isMatched = bilgi.name
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) ||
+                        bilgi.cameraName
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) ||
+                        bilgi.location
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) ||
+                        bilgi.gateway
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) ||
+                        bilgi.group
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) ||
+                        bilgi.uuid
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) ||
+                        bilgi.streamID
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) ||
+                        bilgi.staticUrlList
+                            .toList()
+                            .contains(searchText.toLowerCase()) ||
+                        bilgi.status
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) ||
+                        bilgi.recordStatus
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) ||
+                        bilgi.analyticsStatus
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase());
+
+                    if (!isMatched) {
+                      return SizedBox(); // Arama kriterlerine uymayan öğeleri gösterme
+                    }
+
+                    return Column(
+                      children: [
+                        ListTile(
+                          leading: Icon(getCameraIcon()),
+                          title: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  bilgi.baslik,
+                                  style: TextStyle(fontSize: 18.0),
+                                ),
+                              ),
+                              Icon(
+                                statusIcon,
+                                color: getStatusColor(bilgi.status),
+                                size: 28.0,
+                              ),
+                            ],
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    DetaySayfasi(bilgi: bilgi),
+                              ),
+                            );
+                          },
+                        ),
+                        Divider(),
+                      ],
+                    );
+                  },
+                ),
+              ),
           ],
         ),
       ),
@@ -744,20 +795,26 @@ class AnaSayfa extends StatelessWidget {
       ),
       drawer: Menu.build(context),
       body: Center(
-        child: RichText(
-          textAlign: TextAlign.center,
-          text: TextSpan(
-            style: TextStyle(color: Colors.black),
-            children: <TextSpan>[
-              TextSpan(
-                text: 'Welcome To Sparse Technology',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20.0,
-                ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            RichText(
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                style: TextStyle(color: Colors.black),
+                children: <TextSpan>[],
               ),
-            ],
-          ),
+            ),
+            Center(
+              child: Image.network(
+                'https://www.sparsetechnology.com/static/logoIcon.png',
+                width: 200, // Set the desired width of the image
+                height: 200, // Set the desired height of the image
+                fit: BoxFit
+                    .contain, // Adjust how the image is displayed within the space
+              ),
+            ),
+          ],
         ),
       ),
     );
