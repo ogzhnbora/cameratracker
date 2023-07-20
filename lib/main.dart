@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:grpc/grpc.dart';
 import 'protos/ivssapi.pbgrpc.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 Color getStatusColor(String status) {
   switch (status) {
@@ -751,11 +753,49 @@ class AnaSayfa extends StatelessWidget {
 String currentIp = "10.5.5.0";
 int currentPort = 28289;
 
-class AyarlarSayfasi extends StatelessWidget {
-  final TextEditingController ipController =
-      TextEditingController(text: currentIp);
-  final TextEditingController portController =
-      TextEditingController(text: currentPort.toString());
+class AyarlarSayfasi extends StatefulWidget {
+  @override
+  AyarlarSayfasiState createState() => AyarlarSayfasiState();
+}
+
+class AyarlarSayfasiState extends State<AyarlarSayfasi> {
+  late TextEditingController ipController;
+  late TextEditingController portController;
+
+  @override
+  void initState() {
+    super.initState();
+    ipController = TextEditingController(text: currentIp);
+    portController = TextEditingController(text: currentPort.toString());
+  }
+
+  void scanQRCode() async {
+    // İzin istemeden önce kamera iznini kontrol edelim
+    if (await Permission.camera.request().isGranted) {
+      // Kamera izni verildiyse QR kodu tarama işlemini gerçekleştir
+      String scanResult = await FlutterBarcodeScanner.scanBarcode(
+        '#FF0000', // Tarayıcı arka plan rengi
+        'Vazgeç', // Vazgeç butonu metni
+        true, // Tarayıcı başarıyla tarandığında bip sesi çalsın mı?
+        ScanMode.QR, // Sadece QR kodları taransın
+      );
+
+      // QR kodu tarandıktan sonra, scanResult değişkeni içinde QR kodunun değeri olacak.
+      if (scanResult != '-1') {
+        // Eğer QR kodu başarıyla tarandıysa alınan değerleri IP ve Port olarak güncelleyin.
+        setState(() {
+          List<String> ipPort = scanResult.split(':');
+          if (ipPort.length == 2) {
+            ipController.text = ipPort[0];
+            portController.text = ipPort[1];
+          }
+        });
+      }
+    } else {
+      // Kamera izni verilmediyse kullanıcıya uygun bir mesaj gösterin
+      print('Kamera izni verilmedi.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -806,6 +846,16 @@ class AyarlarSayfasi extends StatelessWidget {
                   Navigator.pop(context);
                 },
                 child: Text('Kaydet'),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'QR Kod Seçeneği',
+                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: scanQRCode, // QR kod tarama fonksiyonunu tetikle
+                child: Text('QR Kod Tarama'),
               ),
             ],
           ),
