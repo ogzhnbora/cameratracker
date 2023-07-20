@@ -18,8 +18,8 @@ Color getStatusColor(String status) {
 
 void main() async {
   final channel = ClientChannel(
-    '10.5.5.0',
-    port: 28289,
+    currentIp,
+    port: currentPort,
     options: ChannelOptions(credentials: ChannelCredentials.insecure()),
   );
   final client = IvssApiServerClient(channel);
@@ -363,7 +363,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sparse Technology',
-      theme: ThemeData(primarySwatch: Colors.deepPurple),
+      theme: ThemeData(primarySwatch: Colors.cyan),
       initialRoute: '/',
       onGenerateRoute: (RouteSettings settings) {
         switch (settings.name) {
@@ -472,9 +472,7 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
     return Icons.videocam; // Kamera ikonu
   }
 
-  DateTime? lastRefreshTime;
   bool isSearching = false;
-  bool isRefreshing = false;
 
   @override
   void initState() {
@@ -483,19 +481,12 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
   }
 
   Future<void> _refreshCameras() async {
-    setState(() {
-      isRefreshing = true;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Cameras refreshed')),
-    );
-
+    // Handle the refresh logic here
     ClientChannel? channel;
     try {
       channel = ClientChannel(
-        '10.5.5.0',
-        port: 28289,
+        currentIp,
+        port: currentPort,
         options: ChannelOptions(credentials: ChannelCredentials.insecure()),
       );
       final client = IvssApiServerClient(channel);
@@ -583,15 +574,12 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
       }
 
       setState(() {
-        lastRefreshTime = DateTime.now(); // Update the last refresh time
+        filteredBilgiler = List.from(updatedBilgilerList);
       });
     } catch (e) {
       print('İstek gönderme hatasi: $e');
     } finally {
       channel?.shutdown();
-      setState(() {
-        isRefreshing = false;
-      });
     }
   }
 
@@ -667,116 +655,55 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
             Padding(
               padding: const EdgeInsets.all(10.0),
               child: Text(
-                'Last Refreshed: ${DateFormat('HH:mm:ss   dd/MM/yyyy ').format(lastRefreshTime ?? DateTime.now())}',
+                'Last Refreshed: ${DateFormat('HH:mm:ss   dd/MM/yyyy ').format(DateTime.now())}',
                 style: TextStyle(fontSize: 18.0),
               ),
             ),
-            if (isRefreshing) // Show a loading indicator if cameras are being refreshed
-              Expanded(
-                child: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-            if (!isRefreshing)
-              Expanded(
-                child: ListView.builder(
-                  itemCount: filteredBilgiler.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    final bilgi = filteredBilgiler[index];
+            Expanded(
+              child: ListView.builder(
+                itemCount: filteredBilgiler.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final bilgi = filteredBilgiler[index];
 
-                    final statusIcon = getStatusIcon(bilgi.status);
+                  final statusIcon = getStatusIcon(bilgi.status);
 
-                    final isMatched = bilgi.name
-                            .toLowerCase()
-                            .contains(searchText.toLowerCase()) ||
-                        bilgi.cameraName
-                            .toLowerCase()
-                            .contains(searchText.toLowerCase()) ||
-                        bilgi.location
-                            .toLowerCase()
-                            .contains(searchText.toLowerCase()) ||
-                        bilgi.gateway
-                            .toLowerCase()
-                            .contains(searchText.toLowerCase()) ||
-                        bilgi.group
-                            .toLowerCase()
-                            .contains(searchText.toLowerCase()) ||
-                        bilgi.uuid
-                            .toLowerCase()
-                            .contains(searchText.toLowerCase()) ||
-                        bilgi.streamID
-                            .toLowerCase()
-                            .contains(searchText.toLowerCase()) ||
-                        bilgi.staticUrlList
-                            .toList()
-                            .contains(searchText.toLowerCase()) ||
-                        bilgi.status
-                            .toLowerCase()
-                            .contains(searchText.toLowerCase()) ||
-                        bilgi.recordStatus
-                            .toLowerCase()
-                            .contains(searchText.toLowerCase()) ||
-                        bilgi.analyticsStatus
-                            .toLowerCase()
-                            .contains(searchText.toLowerCase());
-
-                    if (!isMatched) {
-                      return SizedBox(); // Arama kriterlerine uymayan öğeleri gösterme
-                    }
-
-                    return Column(
-                      children: [
-                        ListTile(
-                          leading: Icon(getCameraIcon()),
-                          title: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  bilgi.baslik,
-                                  style: TextStyle(fontSize: 18.0),
-                                ),
+                  return Column(
+                    children: [
+                      ListTile(
+                        leading: Icon(getCameraIcon()),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                bilgi.baslik,
+                                style: TextStyle(fontSize: 18.0),
                               ),
-                              Icon(
-                                statusIcon,
-                                color: getStatusColor(bilgi.status),
-                                size: 28.0,
-                              ),
-                            ],
-                          ),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    DetaySayfasi(bilgi: bilgi),
-                              ),
-                            );
-                          },
+                            ),
+                            Icon(
+                              statusIcon,
+                              color: getStatusColor(bilgi.status),
+                              size: 28.0,
+                            ),
+                          ],
                         ),
-                        Divider(),
-                      ],
-                    );
-                  },
-                ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DetaySayfasi(bilgi: bilgi),
+                            ),
+                          );
+                        },
+                      ),
+                      Divider(),
+                    ],
+                  );
+                },
               ),
+            ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class AyarlarSayfasi extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Settings'),
-      ),
-      drawer: Menu.build(context),
-      body: Center(
-        child: Text("Ayarlar"),
       ),
     );
   }
@@ -815,6 +742,73 @@ class AnaSayfa extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+String currentIp = "10.5.5.0";
+int currentPort = 28289;
+
+class AyarlarSayfasi extends StatelessWidget {
+  final TextEditingController ipController =
+      TextEditingController(text: currentIp);
+  final TextEditingController portController =
+      TextEditingController(text: currentPort.toString());
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Ayarlar"),
+      ),
+      body: Padding(
+        padding: EdgeInsets.all(20.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'IP ve Port Numarası',
+                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: ipController,
+                decoration: InputDecoration(
+                  labelText: 'IP adresi',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: portController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Port numarası',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  String ip = ipController.text;
+                  String port = portController.text;
+
+                  // Validate and update the IP and port values
+                  if (ip.isNotEmpty && int.tryParse(port) != null) {
+                    currentIp = ip;
+                    currentPort = int.parse(port);
+                  }
+
+                  // Navigate back to the previous screen
+                  Navigator.pop(context);
+                },
+                child: Text('Kaydet'),
+              ),
+            ],
+          ),
         ),
       ),
     );
