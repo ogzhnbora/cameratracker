@@ -4,19 +4,7 @@ import 'protos/ivssapi.pbgrpc.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
-
-Color getStatusColor(String status) {
-  switch (status) {
-    case 'Critical':
-      return Colors.red;
-    case 'Passing':
-      return Colors.green;
-    case 'Warning':
-      return Colors.orange;
-    default:
-      return Colors.black;
-  }
-}
+import 'dart:convert'; // jsonDecode
 
 void main() async {
   final channel = ClientChannel(
@@ -85,12 +73,16 @@ void main() async {
         cameraInfo.status = 'Passing';
       } else if (status == 'CRITICAL') {
         cameraInfo.status = 'Critical';
+      } else if (status == 'WARNING') {
+        cameraInfo.status = 'Warning';
       } else {
         cameraInfo.status = 'Unknown';
       }
 
       if (recordStatus == 'PASSING') {
         cameraInfo.recordStatus = 'Passing';
+      } else if (recordStatus == 'WARNING') {
+        cameraInfo.recordStatus = 'Warning';
       } else if (recordStatus == 'CRITICAL') {
         cameraInfo.recordStatus = 'Critical';
       } else {
@@ -99,6 +91,8 @@ void main() async {
 
       if (analyticsStatus == 'PASSING') {
         cameraInfo.analyticsStatus = 'Passing';
+      } else if (analyticsStatus == 'WARNING') {
+        cameraInfo.analyticsStatus = 'Warning';
       } else if (analyticsStatus == 'CRITICAL') {
         cameraInfo.analyticsStatus = 'Critical';
       } else {
@@ -171,6 +165,19 @@ class DetaySayfasiState extends State<DetaySayfasi> {
     return items
         .where((item) => item.toLowerCase().contains(searchText.toLowerCase()))
         .toList();
+  }
+
+  Color getStatusColor(String status) {
+    switch (status) {
+      case 'Critical':
+        return Colors.red;
+      case 'Passing':
+        return Colors.green;
+      case 'Warning':
+        return Colors.orange;
+      default:
+        return Colors.black;
+    }
   }
 
   @override
@@ -462,6 +469,8 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
       case 'Passing':
         return Icons.check_circle;
       case 'Critical':
+        return Icons.warning;
+      case 'Warning':
         return Icons.error;
       default:
         return Icons.help_outline;
@@ -554,12 +563,16 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
           cameraInfo.status = 'Passing';
         } else if (status == 'CRITICAL') {
           cameraInfo.status = 'Critical';
+        } else if (status == 'WARNING') {
+          cameraInfo.status = 'Warning';
         } else {
           cameraInfo.status = 'Unknown';
         }
 
         if (recordStatus == 'PASSING') {
           cameraInfo.recordStatus = 'Passing';
+        } else if (recordStatus == 'WARNING') {
+          cameraInfo.recordStatus = 'Warning';
         } else if (recordStatus == 'CRITICAL') {
           cameraInfo.recordStatus = 'Critical';
         } else {
@@ -568,6 +581,8 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
 
         if (analyticsStatus == 'PASSING') {
           cameraInfo.analyticsStatus = 'Passing';
+        } else if (analyticsStatus == 'WARNING') {
+          cameraInfo.analyticsStatus = 'Warning';
         } else if (analyticsStatus == 'CRITICAL') {
           cameraInfo.analyticsStatus = 'Critical';
         } else {
@@ -585,6 +600,19 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
     }
   }
 
+  Color getStatusColor(String status) {
+    switch (status) {
+      case 'Critical':
+        return Colors.red;
+      case 'Passing':
+        return Colors.green;
+      case 'Warning':
+        return Colors.orange;
+      default:
+        return Colors.black;
+    }
+  }
+
   void _toggleSearch() {
     setState(() {
       isSearching = !isSearching;
@@ -594,6 +622,18 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
         filteredBilgiler = List.from(widget.bilgiler);
       }
     });
+  }
+
+  void scanQRcode1() async {
+    if (await Permission.camera.request().isGranted) {
+      // Kamera izni verildiyse QR kodu tarama işlemini gerçekleştir
+      String addcameraresult = await FlutterBarcodeScanner.scanBarcode(
+        '#FF0000', // Tarayıcı arka plan rengi
+        'Vazgeç', // Vazgeç butonu metni
+        true, // Tarayıcı başarıyla tarandığında bip sesi çalsın mı?
+        ScanMode.QR, // Sadece QR kodları taransın
+      );
+    }
   }
 
   void filterItems() {
@@ -643,10 +683,21 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
               )
             : Text('Cameras'),
         actions: [
-          IconButton(
-            icon: Icon(Icons.search),
-            onPressed: _toggleSearch,
-          ),
+          if (isSearching)
+            IconButton(
+              icon: Icon(Icons.search),
+              onPressed: _toggleSearch,
+            ),
+          if (!isSearching)
+            IconButton(
+              icon: Icon(Icons.search),
+              onPressed: _toggleSearch,
+            ),
+          if (!isSearching)
+            IconButton(
+              icon: Icon(Icons.add),
+              onPressed: scanQRcode1,
+            ),
         ],
       ),
       drawer: Menu.build(context),
@@ -783,41 +834,47 @@ class AyarlarSayfasiState extends State<AyarlarSayfasi> {
       // QR kodu tarandıktan sonra, scanResult değişkeni içinde QR kodunun değeri olacak.
       if (scanResult != '-1') {
         // Eğer QR kodu başarıyla tarandıysa alınan değerleri IP ve Port olarak güncelleyin.
-        setState(() {
-          List<String> ipPort = scanResult.split(':');
-          if (ipPort.length == 2) {
-            ipController.text = ipPort[0];
-            portController.text = ipPort[1];
-          }
-        });
+        Map<String, dynamic> qrData = jsonDecode(scanResult);
+        if (qrData.containsKey("host") && qrData.containsKey("port")) {
+          setState(() {
+            String scannedHost = qrData["host"];
+            int scannedPort = qrData["port"];
+
+            ipController.text = scannedHost;
+            portController.text = scannedPort.toString();
+
+            currentIp = scannedHost;
+            currentPort = scannedPort;
+          });
+        }
       }
     } else {
       // Kamera izni verilmediyse kullanıcıya uygun bir mesaj gösterin
-      print('Kamera izni verilmedi.');
+      print('Please give permission for camera.');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Ayarlar"),
-      ),
-      body: Padding(
-        padding: EdgeInsets.all(20.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        appBar: AppBar(
+          title: Text("Settings"),
+        ),
+        drawer: Menu.build(context),
+        body: Padding(
+          padding: EdgeInsets.all(20.0),
+          child: SingleChildScrollView(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
-                'IP ve Port Numarası',
+                'IP and Port Number',
                 style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 10),
               TextField(
                 controller: ipController,
                 decoration: InputDecoration(
-                  labelText: 'IP adresi',
+                  labelText: 'IP address',
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -826,41 +883,35 @@ class AyarlarSayfasiState extends State<AyarlarSayfasi> {
                 controller: portController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: 'Port numarası',
+                  labelText: 'Port number',
                   border: OutlineInputBorder(),
                 ),
               ),
               SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  String ip = ipController.text;
-                  String port = portController.text;
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      String ip = ipController.text;
+                      String port = portController.text;
 
-                  // Validate and update the IP and port values
-                  if (ip.isNotEmpty && int.tryParse(port) != null) {
-                    currentIp = ip;
-                    currentPort = int.parse(port);
-                  }
-
-                  // Navigate back to the previous screen
-                  Navigator.pop(context);
-                },
-                child: Text('Kaydet'),
+                      // Validate and update the IP and port values
+                      if (ip.isNotEmpty && int.tryParse(port) != null) {
+                        currentIp = ip;
+                        currentPort = int.parse(port);
+                      }
+                    },
+                    child: Text('Save'),
+                  ),
+                  ElevatedButton(
+                    onPressed: scanQRCode, // QR kod tarama fonksiyonunu tetikle
+                    child: Icon(Icons.qr_code_scanner),
+                  ),
+                ],
               ),
-              SizedBox(height: 20),
-              Text(
-                'QR Kod Seçeneği',
-                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: scanQRCode, // QR kod tarama fonksiyonunu tetikle
-                child: Text('QR Kod Tarama'),
-              ),
-            ],
+            ]),
           ),
-        ),
-      ),
-    );
+        ));
   }
 }
