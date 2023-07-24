@@ -6,106 +6,10 @@ import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:convert'; // jsonDecode
 
-void main() async {
-  final channel = ClientChannel(
-    currentIp,
-    port: currentPort,
-    options: ChannelOptions(credentials: ChannelCredentials.insecure()),
-  );
-  final client = IvssApiServerClient(channel);
-
-  try {
-    final request = GetCameraListReq();
-    final response = await client.getCameraList(request);
-
-    List<Bilgi> bilgiler = [];
-    for (var camera in response.camlist) {
-      final cameraInfo = camera.info;
-      final streamInfo = camera.streamSettings.streams.first;
-
-      final staticUrls = camera.streamSettings.staticUrl.url;
-      final staticUrlList = staticUrls.isNotEmpty
-          ? [staticUrls.first.toString()]
-          : [streamInfo.url];
-      final bilgi = Bilgi(
-        cameraInfo.name,
-        cameraInfo.name,
-        cameraInfo.location,
-        cameraInfo.gateway,
-        cameraInfo.group,
-        cameraInfo.name,
-        streamInfo.streamID,
-        staticUrlList,
-        camera.uuid,
-        [],
-        [],
-        [],
-      );
-      bilgiler.add(bilgi);
-    }
-
-    final healthInfosRequest = GetCameraHealthInfosReq();
-    healthInfosRequest.uuids.addAll(bilgiler.map((bilgi) => bilgi.uuid));
-
-    final healthInfosResponse =
-        await client.getCameraHealthInfos(healthInfosRequest);
-    final cameraHealthInfos = healthInfosResponse.camhealthinfos;
-
-    for (var cameraHealthInfoEntry in cameraHealthInfos.entries) {
-      final cameraID = cameraHealthInfoEntry.key;
-      final cameraHealthInfo = cameraHealthInfoEntry.value;
-
-      final cameraInfo = bilgiler.firstWhere((bilgi) => bilgi.uuid == cameraID);
-
-      final status = cameraHealthInfo.status.status.name;
-      final recordStatus = cameraHealthInfo.recordstatus.status.name;
-      final analyticsStatus = cameraHealthInfo.analyticsstatus.status.name;
-      cameraInfo.reasons = cameraHealthInfo.status.reasons.toList();
-
-      cameraInfo.analyticreasons =
-          cameraHealthInfo.analyticsstatus.reasons.toList();
-      cameraInfo.recordreasons = cameraHealthInfo.recordstatus.reasons.toList();
-      cameraInfo.point = cameraHealthInfo.status.point;
-      cameraInfo.recordpoint = cameraHealthInfo.recordstatus.point;
-      cameraInfo.analyticpoint = cameraHealthInfo.analyticsstatus.point;
-
-      if (status == 'PASSING') {
-        cameraInfo.status = 'Passing';
-      } else if (status == 'CRITICAL') {
-        cameraInfo.status = 'Critical';
-      } else if (status == 'WARNING') {
-        cameraInfo.status = 'Warning';
-      } else {
-        cameraInfo.status = 'Unknown';
-      }
-
-      if (recordStatus == 'PASSING') {
-        cameraInfo.recordStatus = 'Passing';
-      } else if (recordStatus == 'WARNING') {
-        cameraInfo.recordStatus = 'Warning';
-      } else if (recordStatus == 'CRITICAL') {
-        cameraInfo.recordStatus = 'Critical';
-      } else {
-        cameraInfo.recordStatus = 'Unknown';
-      }
-
-      if (analyticsStatus == 'PASSING') {
-        cameraInfo.analyticsStatus = 'Passing';
-      } else if (analyticsStatus == 'WARNING') {
-        cameraInfo.analyticsStatus = 'Warning';
-      } else if (analyticsStatus == 'CRITICAL') {
-        cameraInfo.analyticsStatus = 'Critical';
-      } else {
-        cameraInfo.analyticsStatus = 'Unknown';
-      }
-    }
-
-    runApp(MyApp(bilgiler: bilgiler));
-  } catch (e) {
-    print('İstek gönderme hatasi: $e');
-  } finally {
-    await channel.shutdown();
-  }
+void main() {
+  runApp(MyApp(
+    bilgiler: [],
+  ));
 }
 
 class Bilgi {
@@ -372,7 +276,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sparse Technology',
-      theme: ThemeData(primarySwatch: Colors.cyan),
+      theme: ThemeData(primarySwatch: Colors.blue),
       initialRoute: '/',
       onGenerateRoute: (RouteSettings settings) {
         switch (settings.name) {
@@ -409,38 +313,30 @@ class Menu {
         children: <Widget>[
           ListTile(
             leading: Icon(Icons.home, size: 24.0),
-            title: Padding(
-              padding: EdgeInsets.only(top: 8.0, bottom: 8.0),
-              child: Text(
-                'Home Page',
-                style: TextStyle(fontSize: 16.0),
-              ),
+            title: Text(
+              'Ana Sayfa',
+              style: TextStyle(fontSize: 16.0),
             ),
             onTap: () {
-              anaSayfayaGit(context); // Ana sayfaya git
+              anaSayfayaGit(context);
             },
           ),
           ListTile(
             leading: Icon(Icons.camera_alt, size: 24.0),
-            title: Padding(
-              padding: EdgeInsets.only(top: 8.0, bottom: 8.0),
-              child: Text(
-                'Cameras',
-                style: TextStyle(fontSize: 16.0),
-              ),
+            title: Text(
+              'Kameralar',
+              style: TextStyle(fontSize: 16.0),
             ),
             onTap: () {
-              kameralarSayfasinaGit(context); // Kameralar sayfasına git
+              kameralarSayfasinaGit(context);
             },
           ),
+          Divider(), // Araya bir ayraç ekleyelim
           ListTile(
             leading: Icon(Icons.settings, size: 24.0),
-            title: Padding(
-              padding: EdgeInsets.only(top: 8.0, bottom: 8.0),
-              child: Text(
-                'Settings',
-                style: TextStyle(fontSize: 16.0),
-              ),
+            title: Text(
+              'Ayarlar',
+              style: TextStyle(fontSize: 16.0),
             ),
             onTap: () {
               Navigator.pushNamed(context, '/ayarlar');
@@ -464,6 +360,64 @@ class KameralarSayfasi extends StatefulWidget {
 TextEditingController searchController = TextEditingController();
 
 class KameralarSayfasiState extends State<KameralarSayfasi> {
+  void onCameraAdded(Bilgi newCamera) {
+    setState(() {
+      widget.bilgiler.add(newCamera);
+      filteredBilgiler
+          .add(newCamera); // Also add to the filtered list for consistency
+    });
+  }
+
+  void _openAddCameraPage() async {
+    final newCamera = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddCameraPage(),
+      ),
+    );
+
+    if (newCamera != null) {
+      if (_isCameraInfoValid(newCamera)) {
+        // Assuming 'onCameraAdded' is a function to add the new camera to the list.
+        onCameraAdded(newCamera);
+      } else {
+        // Show a warning dialog if camera information is incomplete.
+        // ignore: use_build_context_synchronously
+        showDialog(
+          context: context,
+          barrierDismissible:
+              false, // Prevent dialog from being dismissed by tapping outside
+          builder: (BuildContext context) {
+            return WillPopScope(
+              // Prevent the dialog from being closed when the back button is pressed
+              onWillPop: () async => false,
+              child: AlertDialog(
+                title: Text('Incomplete Camera Information'),
+                content: Text(
+                  'Please fill in all the required fields to add the camera.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      }
+    }
+  }
+
+  bool _isCameraInfoValid(Bilgi camera) {
+    return camera.name.isNotEmpty &&
+        camera.gateway.isNotEmpty &&
+        camera.staticUrlList.isNotEmpty;
+  }
+
   IconData getStatusIcon(String status) {
     switch (status) {
       case 'Passing':
@@ -489,6 +443,7 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
   void initState() {
     super.initState();
     filteredBilgiler = List.from(widget.bilgiler);
+    _refreshCameras();
   }
 
   Future<void> _refreshCameras() async {
@@ -624,18 +579,6 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
     });
   }
 
-  void scanQRcode1() async {
-    if (await Permission.camera.request().isGranted) {
-      // Kamera izni verildiyse QR kodu tarama işlemini gerçekleştir
-      String addcameraresult = await FlutterBarcodeScanner.scanBarcode(
-        '#FF0000', // Tarayıcı arka plan rengi
-        'Vazgeç', // Vazgeç butonu metni
-        true, // Tarayıcı başarıyla tarandığında bip sesi çalsın mı?
-        ScanMode.QR, // Sadece QR kodları taransın
-      );
-    }
-  }
-
   void filterItems() {
     setState(() {
       filteredBilgiler = widget.bilgiler
@@ -664,8 +607,11 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.blue, // Customize app bar color
+        elevation: 4, // Add elevation for a subtle shadow
         title: isSearching
             ? TextField(
+                // Customize search field appearance
                 controller: searchController,
                 onChanged: (value) {
                   setState(() {
@@ -681,81 +627,86 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
                   border: InputBorder.none,
                 ),
               )
-            : Text('Cameras'),
+            : Center(
+                child: Text('Cameras', style: TextStyle(color: Colors.white)),
+              ),
         actions: [
-          if (isSearching)
-            IconButton(
-              icon: Icon(Icons.search),
-              onPressed: _toggleSearch,
-            ),
-          if (!isSearching)
-            IconButton(
-              icon: Icon(Icons.search),
-              onPressed: _toggleSearch,
-            ),
+          IconButton(
+            icon: Icon(Icons.search),
+            onPressed: _toggleSearch,
+          ),
           if (!isSearching)
             IconButton(
               icon: Icon(Icons.add),
-              onPressed: scanQRcode1,
+              onPressed: _openAddCameraPage,
             ),
         ],
       ),
       drawer: Menu.build(context),
-      body: RefreshIndicator(
-        onRefresh: _refreshCameras,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(10.0),
-              child: Text(
-                'Last Refreshed: ${DateFormat('HH:mm:ss   dd/MM/yyyy ').format(DateTime.now())}',
-                style: TextStyle(fontSize: 18.0),
+      body: Container(
+        color: Colors.grey[100], // Set the background color
+        child: RefreshIndicator(
+          onRefresh: _refreshCameras,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(10.0),
+                child: Text(
+                  'Last Refreshed: ${DateFormat('HH:mm:ss   dd/MM/yyyy ').format(DateTime.now())}',
+                  style: TextStyle(fontSize: 18.0),
+                ),
               ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: filteredBilgiler.length,
-                itemBuilder: (BuildContext context, int index) {
-                  final bilgi = filteredBilgiler[index];
+              Expanded(
+                child: ListView.builder(
+                  itemCount: filteredBilgiler.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final bilgi = filteredBilgiler[index];
+                    final statusIcon = getStatusIcon(bilgi.status);
 
-                  final statusIcon = getStatusIcon(bilgi.status);
-
-                  return Column(
-                    children: [
-                      ListTile(
-                        leading: Icon(getCameraIcon()),
-                        title: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                bilgi.baslik,
-                                style: TextStyle(fontSize: 18.0),
-                              ),
+                    return Column(
+                      children: [
+                        // Apply ListTileTheme to customize the appearance
+                        ListTileTheme(
+                          tileColor: Colors
+                              .white, // Customize list item background color
+                          child: ListTile(
+                            leading: Icon(getCameraIcon(),
+                                color: Colors.blue), // Customize icon color
+                            title: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    bilgi.baslik,
+                                    style: TextStyle(fontSize: 18.0),
+                                  ),
+                                ),
+                                Icon(
+                                  statusIcon,
+                                  color: getStatusColor(bilgi.status),
+                                  size: 28.0,
+                                ),
+                              ],
                             ),
-                            Icon(
-                              statusIcon,
-                              color: getStatusColor(bilgi.status),
-                              size: 28.0,
-                            ),
-                          ],
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      DetaySayfasi(bilgi: bilgi),
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => DetaySayfasi(bilgi: bilgi),
-                            ),
-                          );
-                        },
-                      ),
-                      Divider(),
-                    ],
-                  );
-                },
+                        Divider(),
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -913,5 +864,105 @@ class AyarlarSayfasiState extends State<AyarlarSayfasi> {
             ]),
           ),
         ));
+  }
+}
+
+class AddCameraPage extends StatefulWidget {
+  @override
+  AddCameraPageState createState() => AddCameraPageState();
+}
+
+class AddCameraPageState extends State<AddCameraPage> {
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController locationController = TextEditingController();
+  final TextEditingController gatewayController = TextEditingController();
+  final TextEditingController groupController = TextEditingController();
+  final TextEditingController cameraIDController = TextEditingController();
+  final TextEditingController streamIDController = TextEditingController();
+  final TextEditingController staticUrlListController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Add Camera'),
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildTextField(nameController, 'Name'),
+            SizedBox(height: 10),
+            _buildTextField(locationController, 'Location'),
+            SizedBox(height: 10),
+            _buildTextField(gatewayController, 'Gateway'),
+            SizedBox(height: 10),
+            _buildTextField(groupController, 'Group'),
+            SizedBox(height: 10),
+            _buildTextField(
+                staticUrlListController, 'Static URL (comma-separated)'),
+            SizedBox(height: 20),
+            _buildSaveButton(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label) {
+    bool isRequired = label == 'Name' ||
+        label == 'Gateway' ||
+        label == 'Static URL (comma-separated)';
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: isRequired ? '$label*' : label,
+        labelStyle: TextStyle(color: isRequired ? Colors.red : null),
+        border: OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return ElevatedButton(
+      onPressed: () {
+        // Save the camera information and navigate back to the previous page
+        String name = nameController.text;
+        String location = locationController.text;
+        String gateway = gatewayController.text;
+        String group = groupController.text;
+        String cameraID = cameraIDController.text;
+        String streamID = streamIDController.text;
+        String staticUrls = staticUrlListController.text;
+
+        List<String> staticUrlList = staticUrls.split(",");
+
+        Bilgi newCamera = Bilgi(
+          name,
+          name,
+          location,
+          gateway,
+          group,
+          cameraID,
+          streamID,
+          staticUrlList,
+          '',
+          [],
+          [],
+          [],
+        );
+
+        // Pass the newCamera back to the previous page
+        Navigator.pop(context, newCamera);
+      },
+      style: ElevatedButton.styleFrom(
+        padding: EdgeInsets.symmetric(vertical: 20.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+      ),
+      child: Text('Save'),
+    );
   }
 }
