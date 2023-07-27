@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:grpc/grpc.dart';
 import 'protos/ivssapi.pbgrpc.dart';
@@ -5,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:convert'; // jsonDecode
+import 'dart:io';
 
 void main() {
   runApp(MyApp(
@@ -53,6 +57,21 @@ class Bilgi {
         analyticsStatus = 'UNKNOWN';
 }
 
+Color getStatusColor(String status) {
+  switch (status) {
+    case 'Critical':
+      return Colors.red;
+    case 'Passing':
+      return Colors.green;
+    case 'Warning':
+      return Colors.orange;
+    default:
+      return Colors.black;
+  }
+}
+
+late int _portNumber;
+
 class DetaySayfasi extends StatefulWidget {
   final Bilgi bilgi;
 
@@ -63,6 +82,9 @@ class DetaySayfasi extends StatefulWidget {
 }
 
 class DetaySayfasiState extends State<DetaySayfasi> {
+  CameraConnection? _cameraConnection;
+  late String _ipAddress;
+
   String searchText = '';
 
   List<String> filterList(List<String> items) {
@@ -71,16 +93,35 @@ class DetaySayfasiState extends State<DetaySayfasi> {
         .toList();
   }
 
-  Color getStatusColor(String status) {
-    switch (status) {
-      case 'Critical':
-        return Colors.red;
-      case 'Passing':
-        return Colors.green;
-      case 'Warning':
-        return Colors.orange;
-      default:
-        return Colors.black;
+  @override
+  void initState() {
+    super.initState();
+    // Set the IP address and port number of the camera
+    _ipAddress = '10.5.5.0';
+    _portNumber = 50002;
+    // DetaySayfasi oluşturulduğunda kamera bağlantısını başlat
+    _startCameraConnection();
+  }
+
+  @override
+  void dispose() {
+    // DetaySayfasi kapatıldığında kamera bağlantısını sonlandır
+    _stopCameraConnection();
+    super.dispose();
+  }
+
+  late int portnumber;
+
+  // Kamera bağlantısını başlatan fonksiyon
+  void _startCameraConnection() {
+    _cameraConnection = CameraConnection(_ipAddress, _portNumber);
+    _cameraConnection!.connect();
+  }
+
+  // Kamera bağlantısını sonlandıran fonksiyon
+  void _stopCameraConnection() {
+    if (_cameraConnection != null) {
+      _cameraConnection!.closeConnection();
     }
   }
 
@@ -259,6 +300,9 @@ class DetaySayfasiState extends State<DetaySayfasi> {
                       ),
                   ],
                 ),
+
+              // Yeni olarak eklenen CameraStreamWidget bileşeni
+              CameraStreamWidget(cameraConnection: _cameraConnection),
             ],
           ),
         ),
@@ -267,82 +311,59 @@ class DetaySayfasiState extends State<DetaySayfasi> {
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final List<Bilgi> bilgiler;
 
   MyApp({required this.bilgiler});
+
+  @override
+  MyAppState createState() => MyAppState();
+}
+
+class MyAppState extends State<MyApp> {
+  int _selectedIndex = 0;
+
+  List<Widget> _widgetOptions = <Widget>[
+    AnaSayfa(
+      bilgiler: [],
+    ),
+    KameralarSayfasi(
+      bilgiler: [],
+    ),
+    AyarlarSayfasi(),
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sparse Technology',
       theme: ThemeData(primarySwatch: Colors.blue),
-      initialRoute: '/',
-      onGenerateRoute: (RouteSettings settings) {
-        switch (settings.name) {
-          case '/':
-            return MaterialPageRoute(
-                builder: (_) => AnaSayfa(bilgiler: bilgiler));
-          case '/kameralar':
-            return MaterialPageRoute(
-                builder: (_) => KameralarSayfasi(bilgiler: bilgiler));
-          case '/ayarlar':
-            return MaterialPageRoute(builder: (_) => AyarlarSayfasi());
-          default:
-            return null;
-        }
-      },
-    );
-  }
-}
-
-class Menu {
-  static void anaSayfayaGit(BuildContext context) {
-    Navigator.pop(context); // Menüyü kapat
-    Navigator.pushNamed(context, '/'); // Ana sayfaya git
-  }
-
-  static void kameralarSayfasinaGit(BuildContext context) {
-    Navigator.pop(context); // Menüyü kapat
-    Navigator.pushNamed(context, '/kameralar'); // Kameralar sayfasına git
-  }
-
-  static Widget build(BuildContext context) {
-    return Drawer(
-      child: ListView(
-        children: <Widget>[
-          ListTile(
-            leading: Icon(Icons.home, size: 24.0),
-            title: Text(
-              'Ana Sayfa',
-              style: TextStyle(fontSize: 16.0),
+      home: Scaffold(
+        body: _widgetOptions.elementAt(_selectedIndex),
+        bottomNavigationBar: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home),
+              label: 'Home',
             ),
-            onTap: () {
-              anaSayfayaGit(context);
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.camera_alt, size: 24.0),
-            title: Text(
-              'Kameralar',
-              style: TextStyle(fontSize: 16.0),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.camera_alt),
+              label: 'Cameras',
             ),
-            onTap: () {
-              kameralarSayfasinaGit(context);
-            },
-          ),
-          Divider(), // Araya bir ayraç ekleyelim
-          ListTile(
-            leading: Icon(Icons.settings, size: 24.0),
-            title: Text(
-              'Ayarlar',
-              style: TextStyle(fontSize: 16.0),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings),
+              label: 'Settings',
             ),
-            onTap: () {
-              Navigator.pushNamed(context, '/ayarlar');
-            },
-          ),
-        ],
+          ],
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+        ),
       ),
     );
   }
@@ -555,19 +576,6 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
     }
   }
 
-  Color getStatusColor(String status) {
-    switch (status) {
-      case 'Critical':
-        return Colors.red;
-      case 'Passing':
-        return Colors.green;
-      case 'Warning':
-        return Colors.orange;
-      default:
-        return Colors.black;
-    }
-  }
-
   void _toggleSearch() {
     setState(() {
       isSearching = !isSearching;
@@ -607,11 +615,10 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.blue, // Customize app bar color
-        elevation: 4, // Add elevation for a subtle shadow
+        backgroundColor: Colors.blue,
+        elevation: 4,
         title: isSearching
             ? TextField(
-                // Customize search field appearance
                 controller: searchController,
                 onChanged: (value) {
                   setState(() {
@@ -627,14 +634,23 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
                   border: InputBorder.none,
                 ),
               )
-            : Center(
-                child: Text('Cameras', style: TextStyle(color: Colors.white)),
+            : Padding(
+                padding: const EdgeInsets.only(left: 60.0),
+                child: Center(
+                  child: Text('Cameras', style: TextStyle(color: Colors.white)),
+                ),
               ),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: Icon(Icons.search),
             onPressed: _toggleSearch,
           ),
+          if (isSearching)
+            IconButton(
+              icon: Icon(Icons.close),
+              onPressed: _toggleSearch,
+            ),
           if (!isSearching)
             IconButton(
               icon: Icon(Icons.add),
@@ -642,9 +658,8 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
             ),
         ],
       ),
-      drawer: Menu.build(context),
       body: Container(
-        color: Colors.grey[100], // Set the background color
+        color: Colors.grey[100],
         child: RefreshIndicator(
           onRefresh: _refreshCameras,
           child: Column(
@@ -665,13 +680,10 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
 
                     return Column(
                       children: [
-                        // Apply ListTileTheme to customize the appearance
                         ListTileTheme(
-                          tileColor: Colors
-                              .white, // Customize list item background color
+                          tileColor: Colors.white,
                           child: ListTile(
-                            leading: Icon(getCameraIcon(),
-                                color: Colors.blue), // Customize icon color
+                            leading: Icon(getCameraIcon(), color: Colors.blue),
                             title: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -724,7 +736,6 @@ class AnaSayfa extends StatelessWidget {
       appBar: AppBar(
         title: Text('Home Page'),
       ),
-      drawer: Menu.build(context),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -811,7 +822,6 @@ class AyarlarSayfasiState extends State<AyarlarSayfasi> {
         appBar: AppBar(
           title: Text("Settings"),
         ),
-        drawer: Menu.build(context),
         body: Padding(
           padding: EdgeInsets.all(20.0),
           child: SingleChildScrollView(
@@ -963,6 +973,84 @@ class AddCameraPageState extends State<AddCameraPage> {
         ),
       ),
       child: Text('Save'),
+    );
+  }
+}
+
+class CameraConnection {
+  final String ipAddress;
+  final int port;
+
+  Socket? _socket;
+  StreamSubscription? _subscription;
+  StreamController<Uint8List> _streamController = StreamController<Uint8List>();
+  CameraConnection(this.ipAddress, this.port);
+
+  Future<void> connect() async {
+    try {
+      _socket = await Socket.connect(ipAddress, port);
+      _streamController = StreamController<Uint8List>();
+      _socket?.listen(
+        (Uint8List data) {
+          _streamController.add(data);
+        },
+        onError: (error) {
+          _streamController.addError(error);
+        },
+        onDone: () {
+          _streamController.close();
+        },
+      );
+    } catch (e) {
+      throw Exception('Error connecting to the camera: $e');
+    }
+  }
+
+  Stream<Uint8List> get videoStream => _streamController.stream;
+
+  Future<void> closeConnection() async {
+    if (_socket != null && _subscription != null) {
+      await _subscription!.cancel(); // Cancel the stream subscription
+      await _socket!.close();
+    }
+  }
+}
+
+class CameraStreamWidget extends StatefulWidget {
+  final CameraConnection? cameraConnection;
+
+  CameraStreamWidget({required this.cameraConnection});
+
+  @override
+  CameraStreamWidgetState createState() => CameraStreamWidgetState();
+}
+
+class CameraStreamWidgetState extends State<CameraStreamWidget> {
+  @override
+  Widget build(BuildContext context) {
+    if (widget.cameraConnection == null) {
+      // Return an appropriate widget when the connection is null
+      return CircularProgressIndicator();
+    }
+
+    return StreamBuilder<Uint8List>(
+      stream: widget.cameraConnection!.videoStream,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          // Soketten gelen verileri kullanarak videoyu görüntülemek için kullanılacak
+          // uygun bir video bileşeni (örn. VideoPlayer) kullanabilirsiniz.
+          // Bu örnekte, basitçe bir Container'da gösterildiğini varsayalım.
+          return SizedBox(
+            width: double.infinity,
+            height: double.infinity,
+            child: Image.memory(snapshot.data!),
+          );
+        } else if (snapshot.hasError) {
+          return Text('Error: ${snapshot.error}');
+        } else {
+          return CircularProgressIndicator();
+        }
+      },
     );
   }
 }
