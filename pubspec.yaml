@@ -25,7 +25,21 @@ dependencies:
   async: ^2.11.0
   permission_handler: ^10.4.3
   shared_preferences: ^2.2.0
- 
+
+
+  flutter_webrtc: ^0.9.36
+  flutter_launcher_icons: ^0.13.1
+  flutter_ffmpeg: ^0.4.2
+  path_provider: ^2.0.15
+  video_player: ^2.7.0
+  flutter_vlc_player: ^7.2.0
+  media_kit: ^1.1.2+1
+  media_kit_video: ^1.1.2
+  chewie: ^1.7.0
+flutter_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logoIcon.png"
   
  
  
@@ -39,5 +53,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/logoIcon.png  # Logo dosyanızın yolunu buraya ekleyin
-
   

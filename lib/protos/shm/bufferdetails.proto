@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package shm;
+
+message Detail {
+	oneof detail {
+		PBufferPars pbuf_pars = 1;
+	}
+}
+
+message ImageParameters {
+	int64 width = 1;
+	int64 height = 2;
+	int64 fmt = 3;
+	int64 stride = 4;
+	int64 bpp = 5;
+	bool keyframe = 6;
+	bool encoded = 7;
+} 
+
+message MapPair {
+	string key = 1;
+    string val = 2;
+}
+
+message PBufferPars {
+	enum BufferType {
+		BUFFER_INVALID = 0;
+		BUFFER_IMAGE = 1;
+		BUFFER_DATA = 2;
+		BUFFER_CV = 3;
+		BUFFER_FFMPEG = 4;
+		BUFFER_IPCBUFFER = 5;
+	};
+	enum ClockType {
+		CLOCK_90KHZ = 0;
+		CLOCK_SECONDS = 1;
+		CLOCK_MILLISECONDS = 2;
+	};
+	int64 streamBufferNo = 1 ;
+	int64 uniqueNo = 2 ;
+	int64 duration = 3;
+	int64 pts = 4;
+	ClockType ptsType = 5;
+	int64 ptsw = 6;
+	BufferType type = 7;
+	oneof CustomParameters {
+		ImageParameters image = 9;
+	};
+	repeated MapPair meta = 8;
+	int32 codecID = 10;
+}

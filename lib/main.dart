@@ -1,19 +1,16 @@
-import 'dart:async';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:grpc/grpc.dart';
 import 'protos/ivssapi.pbgrpc.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:convert'; // jsonDecode
-import 'dart:io';
+import 'dart:convert';
+import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 
-void main() {
-  runApp(MyApp(
-    bilgiler: [],
-  ));
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  runApp(MyApp(bilgiler: []));
 }
 
 class Bilgi {
@@ -57,21 +54,6 @@ class Bilgi {
         analyticsStatus = 'UNKNOWN';
 }
 
-Color getStatusColor(String status) {
-  switch (status) {
-    case 'Critical':
-      return Colors.red;
-    case 'Passing':
-      return Colors.green;
-    case 'Warning':
-      return Colors.orange;
-    default:
-      return Colors.black;
-  }
-}
-
-late int _portNumber;
-
 class DetaySayfasi extends StatefulWidget {
   final Bilgi bilgi;
 
@@ -82,9 +64,6 @@ class DetaySayfasi extends StatefulWidget {
 }
 
 class DetaySayfasiState extends State<DetaySayfasi> {
-  CameraConnection? _cameraConnection;
-  late String _ipAddress;
-
   String searchText = '';
 
   List<String> filterList(List<String> items) {
@@ -93,42 +72,23 @@ class DetaySayfasiState extends State<DetaySayfasi> {
         .toList();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    // Set the IP address and port number of the camera
-    _ipAddress = '10.5.5.0';
-    _portNumber = 50002;
-    // DetaySayfasi oluşturulduğunda kamera bağlantısını başlat
-    _startCameraConnection();
-  }
-
-  @override
-  void dispose() {
-    // DetaySayfasi kapatıldığında kamera bağlantısını sonlandır
-    _stopCameraConnection();
-    super.dispose();
-  }
-
-  late int portnumber;
-
-  // Kamera bağlantısını başlatan fonksiyon
-  void _startCameraConnection() {
-    _cameraConnection = CameraConnection(_ipAddress, _portNumber);
-    _cameraConnection!.connect();
-  }
-
-  // Kamera bağlantısını sonlandıran fonksiyon
-  void _stopCameraConnection() {
-    if (_cameraConnection != null) {
-      _cameraConnection!.closeConnection();
+  Color getStatusColor(String status) {
+    switch (status) {
+      case 'Critical':
+        return Colors.red;
+      case 'Passing':
+        return Colors.green;
+      case 'Warning':
+        return Colors.orange;
+      default:
+        return Colors.black;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final bilgi = widget.bilgi;
-
+    print('Static URL List: ${bilgi.staticUrlList}');
     final filteredReasons = filterList(bilgi.reasons);
     final filteredAnalyticReasons = filterList(bilgi.analyticreasons);
     final filteredRecordReasons = filterList(bilgi.recordreasons);
@@ -140,6 +100,7 @@ class DetaySayfasiState extends State<DetaySayfasi> {
       body: Padding(
         padding: EdgeInsets.all(20.0),
         child: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -300,9 +261,6 @@ class DetaySayfasiState extends State<DetaySayfasi> {
                       ),
                   ],
                 ),
-
-              // Yeni olarak eklenen CameraStreamWidget bileşeni
-              CameraStreamWidget(cameraConnection: _cameraConnection),
             ],
           ),
         ),
@@ -311,59 +269,89 @@ class DetaySayfasiState extends State<DetaySayfasi> {
   }
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   final List<Bilgi> bilgiler;
 
   MyApp({required this.bilgiler});
-
-  @override
-  MyAppState createState() => MyAppState();
-}
-
-class MyAppState extends State<MyApp> {
-  int _selectedIndex = 0;
-
-  List<Widget> _widgetOptions = <Widget>[
-    AnaSayfa(
-      bilgiler: [],
-    ),
-    KameralarSayfasi(
-      bilgiler: [],
-    ),
-    AyarlarSayfasi(),
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sparse Technology',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: Scaffold(
-        body: _widgetOptions.elementAt(_selectedIndex),
-        bottomNavigationBar: BottomNavigationBar(
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: 'Home',
+      initialRoute: '/',
+      onGenerateRoute: (RouteSettings settings) {
+        switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(
+                builder: (_) => AnaSayfa(bilgiler: bilgiler));
+          case '/kameralar':
+            return MaterialPageRoute(
+                builder: (_) => KameralarSayfasi(bilgiler: bilgiler));
+          case '/ayarlar':
+            return MaterialPageRoute(builder: (_) => AyarlarSayfasi());
+          case '/video':
+            return MaterialPageRoute(
+                builder: (_) => RtspPlayerPage(
+                      rtspUrl:
+                          "rtsp://admin:Sparse11@10.5.5.5:554/H264?ch=1&subtype=0&proto=Onvif",
+                    ));
+          default:
+            return null;
+        }
+      },
+    );
+  }
+}
+
+class Menu {
+  static void anaSayfayaGit(BuildContext context) {
+    Navigator.pop(context); // Menüyü kapat
+    Navigator.pushNamed(context, '/'); // Ana sayfaya git
+  }
+
+  static void kameralarSayfasinaGit(BuildContext context) {
+    Navigator.pop(context); // Menüyü kapat
+    Navigator.pushNamed(context, '/kameralar'); // Kameralar sayfasına git
+  }
+
+  static Widget build(BuildContext context) {
+    return Drawer(
+      child: ListView(
+        children: <Widget>[
+          ListTile(
+            leading: Icon(Icons.home, size: 24.0),
+            title: Text(
+              'Ana Sayfa',
+              style: TextStyle(fontSize: 16.0),
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.camera_alt),
-              label: 'Cameras',
+            onTap: () {
+              anaSayfayaGit(context);
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.camera_alt, size: 24.0),
+            title: Text(
+              'Kameralar',
+              style: TextStyle(fontSize: 16.0),
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings),
-              label: 'Settings',
+            onTap: () {
+              kameralarSayfasinaGit(context);
+            },
+          ),
+
+          Divider(), // Araya bir ayraç ekleyelim
+          ListTile(
+            leading: Icon(Icons.settings, size: 24.0),
+            title: Text(
+              'Ayarlar',
+              style: TextStyle(fontSize: 16.0),
             ),
-          ],
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-        ),
+            onTap: () {
+              Navigator.pushNamed(context, '/ayarlar');
+            },
+          ),
+        ],
       ),
     );
   }
@@ -387,56 +375,6 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
       filteredBilgiler
           .add(newCamera); // Also add to the filtered list for consistency
     });
-  }
-
-  void _openAddCameraPage() async {
-    final newCamera = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddCameraPage(),
-      ),
-    );
-
-    if (newCamera != null) {
-      if (_isCameraInfoValid(newCamera)) {
-        // Assuming 'onCameraAdded' is a function to add the new camera to the list.
-        onCameraAdded(newCamera);
-      } else {
-        // Show a warning dialog if camera information is incomplete.
-        // ignore: use_build_context_synchronously
-        showDialog(
-          context: context,
-          barrierDismissible:
-              false, // Prevent dialog from being dismissed by tapping outside
-          builder: (BuildContext context) {
-            return WillPopScope(
-              // Prevent the dialog from being closed when the back button is pressed
-              onWillPop: () async => false,
-              child: AlertDialog(
-                title: Text('Incomplete Camera Information'),
-                content: Text(
-                  'Please fill in all the required fields to add the camera.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: Text('OK'),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      }
-    }
-  }
-
-  bool _isCameraInfoValid(Bilgi camera) {
-    return camera.name.isNotEmpty &&
-        camera.gateway.isNotEmpty &&
-        camera.staticUrlList.isNotEmpty;
   }
 
   IconData getStatusIcon(String status) {
@@ -576,6 +514,19 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
     }
   }
 
+  Color getStatusColor(String status) {
+    switch (status) {
+      case 'Critical':
+        return Colors.red;
+      case 'Passing':
+        return Colors.green;
+      case 'Warning':
+        return Colors.orange;
+      default:
+        return Colors.black;
+    }
+  }
+
   void _toggleSearch() {
     setState(() {
       isSearching = !isSearching;
@@ -611,14 +562,24 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
     });
   }
 
+  void openCameraView(String rtspUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RtspPlayerPage(rtspUrl: rtspUrl),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.blue,
-        elevation: 4,
+        backgroundColor: Colors.blue, // Customize app bar color
+        elevation: 4, // Add elevation for a subtle shadow
         title: isSearching
             ? TextField(
+                // Customize search field appearance
                 controller: searchController,
                 onChanged: (value) {
                   setState(() {
@@ -634,32 +595,19 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
                   border: InputBorder.none,
                 ),
               )
-            : Padding(
-                padding: const EdgeInsets.only(left: 60.0),
-                child: Center(
-                  child: Text('Cameras', style: TextStyle(color: Colors.white)),
-                ),
+            : Center(
+                child: Text('Cameras', style: TextStyle(color: Colors.white)),
               ),
-        centerTitle: true,
         actions: [
           IconButton(
             icon: Icon(Icons.search),
             onPressed: _toggleSearch,
           ),
-          if (isSearching)
-            IconButton(
-              icon: Icon(Icons.close),
-              onPressed: _toggleSearch,
-            ),
-          if (!isSearching)
-            IconButton(
-              icon: Icon(Icons.add),
-              onPressed: _openAddCameraPage,
-            ),
         ],
       ),
+      drawer: Menu.build(context),
       body: Container(
-        color: Colors.grey[100],
+        color: Colors.grey[100], // Set the background color
         child: RefreshIndicator(
           onRefresh: _refreshCameras,
           child: Column(
@@ -676,44 +624,7 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
                   itemCount: filteredBilgiler.length,
                   itemBuilder: (BuildContext context, int index) {
                     final bilgi = filteredBilgiler[index];
-                    final statusIcon = getStatusIcon(bilgi.status);
-
-                    return Column(
-                      children: [
-                        ListTileTheme(
-                          tileColor: Colors.white,
-                          child: ListTile(
-                            leading: Icon(getCameraIcon(), color: Colors.blue),
-                            title: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    bilgi.baslik,
-                                    style: TextStyle(fontSize: 18.0),
-                                  ),
-                                ),
-                                Icon(
-                                  statusIcon,
-                                  color: getStatusColor(bilgi.status),
-                                  size: 28.0,
-                                ),
-                              ],
-                            ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      DetaySayfasi(bilgi: bilgi),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        Divider(),
-                      ],
-                    );
+                    return _buildCameraTile(bilgi);
                   },
                 ),
               ),
@@ -723,40 +634,74 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
       ),
     );
   }
+
+  Widget _buildCameraTile(Bilgi bilgi) {
+    final statusIcon = getStatusIcon(bilgi.status);
+
+    return ListTileTheme(
+      tileColor: Colors.white,
+      child: ListTile(
+        leading: Icon(
+          getCameraIcon(),
+          color: Colors.blue,
+        ),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                bilgi.baslik,
+                style: TextStyle(fontSize: 18.0),
+              ),
+            ),
+            Icon(
+              statusIcon,
+              color: getStatusColor(bilgi.status),
+              size: 28.0,
+            ),
+            IconButton(
+              icon: Icon(Icons.info_outline), // Question mark icon
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DetaySayfasi(bilgi: bilgi),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        onTap: () => openCameraView(bilgi.staticUrlList[0]),
+        // Kamera düğmelerine tıklandığında direkt olarak kamera görüntüsü açılıyor
+      ),
+    );
+  }
 }
 
-class AnaSayfa extends StatelessWidget {
+class AnaSayfa extends StatefulWidget {
   final List<Bilgi> bilgiler;
 
   AnaSayfa({required this.bilgiler});
 
+  @override
+  AnaSayfaState createState() => AnaSayfaState();
+}
+
+class AnaSayfaState extends State<AnaSayfa> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Home Page'),
       ),
+      drawer: Menu.build(context),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            RichText(
-              textAlign: TextAlign.center,
-              text: TextSpan(
-                style: TextStyle(color: Colors.black),
-                children: <TextSpan>[],
-              ),
-            ),
-            Center(
-              child: Image.network(
-                'https://www.sparsetechnology.com/static/logoIcon.png',
-                width: 200, // Set the desired width of the image
-                height: 200, // Set the desired height of the image
-                fit: BoxFit
-                    .contain, // Adjust how the image is displayed within the space
-              ),
-            ),
-          ],
+        child: Image.network(
+          'https://media.licdn.com/dms/image/C4D0BAQFh77CqgbcWiQ/company-logo_200_200/0/1562136508478?e=2147483647&v=beta&t=WQo79VsB7PMNlP9K3qUWGS5ztwrrsSOXWouQz00m1eo', // İnternetten almak istediğiniz resmin URL'sini buraya yazın
+          width: 200, // Resmin genişliğini istediğiniz değerle değiştirin
+          height: 200, // Resmin yüksekliğini istediğiniz değerle değiştirin
+          fit: BoxFit.contain, // Resmin boyutunu nasıl ayarlayacağınızı seçin
         ),
       ),
     );
@@ -822,6 +767,7 @@ class AyarlarSayfasiState extends State<AyarlarSayfasi> {
         appBar: AppBar(
           title: Text("Settings"),
         ),
+        drawer: Menu.build(context),
         body: Padding(
           padding: EdgeInsets.all(20.0),
           child: SingleChildScrollView(
@@ -977,80 +923,75 @@ class AddCameraPageState extends State<AddCameraPage> {
   }
 }
 
-class CameraConnection {
-  final String ipAddress;
-  final int port;
+class RtspPlayerPage extends StatefulWidget {
+  final String rtspUrl;
 
-  Socket? _socket;
-  StreamSubscription? _subscription;
-  StreamController<Uint8List> _streamController = StreamController<Uint8List>();
-  CameraConnection(this.ipAddress, this.port);
-
-  Future<void> connect() async {
-    try {
-      _socket = await Socket.connect(ipAddress, port);
-      _streamController = StreamController<Uint8List>();
-      _socket?.listen(
-        (Uint8List data) {
-          _streamController.add(data);
-        },
-        onError: (error) {
-          _streamController.addError(error);
-        },
-        onDone: () {
-          _streamController.close();
-        },
-      );
-    } catch (e) {
-      throw Exception('Error connecting to the camera: $e');
-    }
-  }
-
-  Stream<Uint8List> get videoStream => _streamController.stream;
-
-  Future<void> closeConnection() async {
-    if (_socket != null && _subscription != null) {
-      await _subscription!.cancel(); // Cancel the stream subscription
-      await _socket!.close();
-    }
-  }
-}
-
-class CameraStreamWidget extends StatefulWidget {
-  final CameraConnection? cameraConnection;
-
-  CameraStreamWidget({required this.cameraConnection});
+  RtspPlayerPage({required this.rtspUrl});
 
   @override
-  CameraStreamWidgetState createState() => CameraStreamWidgetState();
+  RtspPlayerPageState createState() => RtspPlayerPageState();
 }
 
-class CameraStreamWidgetState extends State<CameraStreamWidget> {
-  @override
-  Widget build(BuildContext context) {
-    if (widget.cameraConnection == null) {
-      // Return an appropriate widget when the connection is null
-      return CircularProgressIndicator();
-    }
+class RtspPlayerPageState extends State<RtspPlayerPage> {
+  late VlcPlayerController _controller;
+  bool _isLoading = true; // Added variable to track loading status
+  double _scale = 1.0; // Added variable to track the scale factor
 
-    return StreamBuilder<Uint8List>(
-      stream: widget.cameraConnection!.videoStream,
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          // Soketten gelen verileri kullanarak videoyu görüntülemek için kullanılacak
-          // uygun bir video bileşeni (örn. VideoPlayer) kullanabilirsiniz.
-          // Bu örnekte, basitçe bir Container'da gösterildiğini varsayalım.
-          return SizedBox(
-            width: double.infinity,
-            height: double.infinity,
-            child: Image.memory(snapshot.data!),
-          );
-        } else if (snapshot.hasError) {
-          return Text('Error: ${snapshot.error}');
-        } else {
-          return CircularProgressIndicator();
-        }
+  @override
+  void initState() {
+    super.initState();
+    _controller = VlcPlayerController.network(
+      widget.rtspUrl,
+      autoPlay: true,
+      // ignore: deprecated_member_use
+      onInit: () {
+        // Set loading status to false when the video starts playing
+        setState(() {
+          _isLoading = false;
+        });
       },
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('RTSP Player')),
+      body: Center(
+        // Use Stack to overlay the player with the loading indicator
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            GestureDetector(
+              // Wrap VlcPlayer with GestureDetector to handle gestures
+              onScaleUpdate: (ScaleUpdateDetails details) {
+                setState(() {
+                  // Update the scale factor on each scale update
+                  _scale = details.scale;
+                });
+              },
+              child: Transform.scale(
+                // Apply the scale factor to the VlcPlayer using Transform.scale
+                scale: _scale,
+                child: VlcPlayer(
+                  controller: _controller,
+                  aspectRatio: 16 / 9, // Or your preferred aspect ratio
+                  placeholder:
+                      Container(), // Use an empty container as placeholder
+                ),
+              ),
+            ),
+            // Show CircularProgressIndicator when loading
+            if (_isLoading) CircularProgressIndicator(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _controller.dispose();
   }
 }
