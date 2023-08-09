@@ -92,6 +92,7 @@ class DetaySayfasiState extends State<DetaySayfasi> {
     final filteredReasons = filterList(bilgi.reasons);
     final filteredAnalyticReasons = filterList(bilgi.analyticreasons);
     final filteredRecordReasons = filterList(bilgi.recordreasons);
+    final filteredstaticurl = filterList(bilgi.staticUrlList);
 
     return Scaffold(
       appBar: AppBar(
@@ -150,7 +151,7 @@ class DetaySayfasiState extends State<DetaySayfasi> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (var url in bilgi.staticUrlList)
+                  for (var url in filteredstaticurl)
                     Text(
                       url,
                       style: TextStyle(fontSize: 18.0),
@@ -269,89 +270,59 @@ class DetaySayfasiState extends State<DetaySayfasi> {
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final List<Bilgi> bilgiler;
 
   MyApp({required this.bilgiler});
+
+  @override
+  MyAppState createState() => MyAppState();
+}
+
+class MyAppState extends State<MyApp> {
+  int _selectedIndex = 0;
+
+  List<Widget> _widgetOptions = <Widget>[
+    AnaSayfa(
+      bilgiler: [],
+    ),
+    KameralarSayfasi(
+      bilgiler: [],
+    ),
+    AyarlarSayfasi(),
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sparse Technology',
       theme: ThemeData(primarySwatch: Colors.blue),
-      initialRoute: '/',
-      onGenerateRoute: (RouteSettings settings) {
-        switch (settings.name) {
-          case '/':
-            return MaterialPageRoute(
-                builder: (_) => AnaSayfa(bilgiler: bilgiler));
-          case '/kameralar':
-            return MaterialPageRoute(
-                builder: (_) => KameralarSayfasi(bilgiler: bilgiler));
-          case '/ayarlar':
-            return MaterialPageRoute(builder: (_) => AyarlarSayfasi());
-          case '/video':
-            return MaterialPageRoute(
-                builder: (_) => RtspPlayerPage(
-                      rtspUrl:
-                          "rtsp://admin:Sparse11@10.5.5.5:554/H264?ch=1&subtype=0&proto=Onvif",
-                    ));
-          default:
-            return null;
-        }
-      },
-    );
-  }
-}
-
-class Menu {
-  static void anaSayfayaGit(BuildContext context) {
-    Navigator.pop(context); // Menüyü kapat
-    Navigator.pushNamed(context, '/'); // Ana sayfaya git
-  }
-
-  static void kameralarSayfasinaGit(BuildContext context) {
-    Navigator.pop(context); // Menüyü kapat
-    Navigator.pushNamed(context, '/kameralar'); // Kameralar sayfasına git
-  }
-
-  static Widget build(BuildContext context) {
-    return Drawer(
-      child: ListView(
-        children: <Widget>[
-          ListTile(
-            leading: Icon(Icons.home, size: 24.0),
-            title: Text(
-              'Ana Sayfa',
-              style: TextStyle(fontSize: 16.0),
+      home: Scaffold(
+        body: _widgetOptions.elementAt(_selectedIndex),
+        bottomNavigationBar: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home),
+              label: 'Home',
             ),
-            onTap: () {
-              anaSayfayaGit(context);
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.camera_alt, size: 24.0),
-            title: Text(
-              'Kameralar',
-              style: TextStyle(fontSize: 16.0),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.camera_alt),
+              label: 'Cameras',
             ),
-            onTap: () {
-              kameralarSayfasinaGit(context);
-            },
-          ),
-
-          Divider(), // Araya bir ayraç ekleyelim
-          ListTile(
-            leading: Icon(Icons.settings, size: 24.0),
-            title: Text(
-              'Ayarlar',
-              style: TextStyle(fontSize: 16.0),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings),
+              label: 'Settings',
             ),
-            onTap: () {
-              Navigator.pushNamed(context, '/ayarlar');
-            },
-          ),
-        ],
+          ],
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+        ),
       ),
     );
   }
@@ -366,17 +337,8 @@ class KameralarSayfasi extends StatefulWidget {
   KameralarSayfasiState createState() => KameralarSayfasiState();
 }
 
-TextEditingController searchController = TextEditingController();
-
 class KameralarSayfasiState extends State<KameralarSayfasi> {
-  void onCameraAdded(Bilgi newCamera) {
-    setState(() {
-      widget.bilgiler.add(newCamera);
-      filteredBilgiler
-          .add(newCamera); // Also add to the filtered list for consistency
-    });
-  }
-
+  TextEditingController searchController = TextEditingController();
   IconData getStatusIcon(String status) {
     switch (status) {
       case 'Passing':
@@ -403,6 +365,27 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
     super.initState();
     filteredBilgiler = List.from(widget.bilgiler);
     _refreshCameras();
+    searchController.addListener(() {
+      _refreshCameras();
+      setState(() {
+        searchText = searchController.text;
+        filterItems();
+        // Arama metni değiştiğinde filtrelemeyi yeniden yap
+      });
+    });
+  }
+
+  void navigateToCameraGrid(List<Bilgi> selectedCameras) async {
+    final selectedCamera = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CameraGridPage(selectedCameras: selectedCameras),
+      ),
+    );
+
+    if (selectedCamera != null) {
+      // Seçilen kamerayı işleme ekle veya görüntüleme yap
+    }
   }
 
   Future<void> _refreshCameras() async {
@@ -530,35 +513,32 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
   void _toggleSearch() {
     setState(() {
       isSearching = !isSearching;
-
       if (!isSearching) {
         searchController.clear();
-        filteredBilgiler = List.from(widget.bilgiler);
+        filterItems();
+        // Arama kapatıldığında filtreleme işlemini yaparak sonuçları güncelle
       }
     });
   }
 
   void filterItems() {
     setState(() {
-      filteredBilgiler = widget.bilgiler
-          .where((bilgi) =>
-              bilgi.name.toLowerCase().contains(searchText.toLowerCase()) ||
-              bilgi.cameraName
-                  .toLowerCase()
-                  .contains(searchText.toLowerCase()) ||
-              bilgi.location.toLowerCase().contains(searchText.toLowerCase()) ||
-              bilgi.gateway.toLowerCase().contains(searchText.toLowerCase()) ||
-              bilgi.group.toLowerCase().contains(searchText.toLowerCase()) ||
-              bilgi.uuid.toLowerCase().contains(searchText.toLowerCase()) ||
-              bilgi.cameraID.toLowerCase().contains(searchText.toLowerCase()) ||
-              bilgi.streamID.toLowerCase().contains(searchText.toLowerCase()) ||
-              bilgi.staticUrlList.toList().contains(searchText.toLowerCase()) ||
-              bilgi.status.toLowerCase().contains(searchText.toLowerCase()) ||
-              bilgi.recordStatus
-                  .toLowerCase()
-                  .contains(searchText.toLowerCase()) ||
-              bilgi.analyticsStatus.contains(searchText.toLowerCase()))
-          .toList();
+      filteredBilgiler = widget.bilgiler.where((bilgi) {
+        final lowercaseSearchText = searchText.toLowerCase();
+        return bilgi.name.toLowerCase().contains(lowercaseSearchText) ||
+            bilgi.cameraName.toLowerCase().contains(lowercaseSearchText) ||
+            bilgi.location.toLowerCase().contains(lowercaseSearchText) ||
+            bilgi.gateway.toLowerCase().contains(lowercaseSearchText) ||
+            bilgi.group.toLowerCase().contains(lowercaseSearchText) ||
+            bilgi.uuid.toLowerCase().contains(lowercaseSearchText) ||
+            bilgi.cameraID.toLowerCase().contains(lowercaseSearchText) ||
+            bilgi.streamID.toLowerCase().contains(lowercaseSearchText) ||
+            bilgi.staticUrlList.any(
+                (url) => url.toLowerCase().contains(lowercaseSearchText)) ||
+            bilgi.status.toLowerCase().contains(lowercaseSearchText) ||
+            bilgi.recordStatus.toLowerCase().contains(lowercaseSearchText) ||
+            bilgi.analyticsStatus.toLowerCase().contains(lowercaseSearchText);
+      }).toList();
     });
   }
 
@@ -579,12 +559,11 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
         elevation: 4, // Add elevation for a subtle shadow
         title: isSearching
             ? TextField(
-                // Customize search field appearance
                 controller: searchController,
                 onChanged: (value) {
                   setState(() {
-                    searchText = value;
-                    filterItems();
+                    searchText = value.toLowerCase();
+                    filterItems(); // Her şey yazıldığında otomatik olarak sonuçları güncelle
                   });
                 },
                 autofocus: true,
@@ -603,9 +582,33 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
             icon: Icon(Icons.search),
             onPressed: _toggleSearch,
           ),
+          IconButton(
+            icon: Icon(Icons.grid_view),
+            onPressed: () async {
+              final selectedCameras = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CameraSelectionPage(
+                    availableCameras: filteredBilgiler,
+                  ),
+                ),
+              );
+
+              if (selectedCameras != null && selectedCameras is List<Bilgi>) {
+                // ignore: use_build_context_synchronously
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CameraGridPage(
+                      selectedCameras: selectedCameras,
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
         ],
       ),
-      drawer: Menu.build(context),
       body: Container(
         color: Colors.grey[100], // Set the background color
         child: RefreshIndicator(
@@ -624,6 +627,45 @@ class KameralarSayfasiState extends State<KameralarSayfasi> {
                   itemCount: filteredBilgiler.length,
                   itemBuilder: (BuildContext context, int index) {
                     final bilgi = filteredBilgiler[index];
+                    if (searchText.isNotEmpty &&
+                        !bilgi.name
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) &&
+                        !bilgi.cameraName
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) &&
+                        !bilgi.location
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) &&
+                        !bilgi.gateway
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) &&
+                        !bilgi.group
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) &&
+                        !bilgi.uuid
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) &&
+                        !bilgi.cameraID
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) &&
+                        !bilgi.streamID
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) &&
+                        !bilgi.staticUrlList.any((url) => url
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase())) &&
+                        !bilgi.status
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) &&
+                        !bilgi.recordStatus
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase()) &&
+                        !bilgi.analyticsStatus
+                            .toLowerCase()
+                            .contains(searchText.toLowerCase())) {
+                      return SizedBox.shrink(); // Hide the item
+                    }
                     return _buildCameraTile(bilgi);
                   },
                 ),
@@ -695,13 +737,12 @@ class AnaSayfaState extends State<AnaSayfa> {
       appBar: AppBar(
         title: Text('Home Page'),
       ),
-      drawer: Menu.build(context),
       body: Center(
         child: Image.network(
           'https://media.licdn.com/dms/image/C4D0BAQFh77CqgbcWiQ/company-logo_200_200/0/1562136508478?e=2147483647&v=beta&t=WQo79VsB7PMNlP9K3qUWGS5ztwrrsSOXWouQz00m1eo', // İnternetten almak istediğiniz resmin URL'sini buraya yazın
-          width: 200, // Resmin genişliğini istediğiniz değerle değiştirin
-          height: 200, // Resmin yüksekliğini istediğiniz değerle değiştirin
-          fit: BoxFit.contain, // Resmin boyutunu nasıl ayarlayacağınızı seçin
+          width: 250, // Resmin genişliğini istediğiniz değerle değiştirin
+          height: 250, // Resmin yüksekliğini istediğiniz değerle değiştirin
+          fit: BoxFit.fill, // Resmin boyutunu nasıl ayarlayacağınızı seçin
         ),
       ),
     );
@@ -767,7 +808,6 @@ class AyarlarSayfasiState extends State<AyarlarSayfasi> {
         appBar: AppBar(
           title: Text("Settings"),
         ),
-        drawer: Menu.build(context),
         body: Padding(
           padding: EdgeInsets.all(20.0),
           child: SingleChildScrollView(
@@ -823,106 +863,6 @@ class AyarlarSayfasiState extends State<AyarlarSayfasi> {
   }
 }
 
-class AddCameraPage extends StatefulWidget {
-  @override
-  AddCameraPageState createState() => AddCameraPageState();
-}
-
-class AddCameraPageState extends State<AddCameraPage> {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController locationController = TextEditingController();
-  final TextEditingController gatewayController = TextEditingController();
-  final TextEditingController groupController = TextEditingController();
-  final TextEditingController cameraIDController = TextEditingController();
-  final TextEditingController streamIDController = TextEditingController();
-  final TextEditingController staticUrlListController = TextEditingController();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Add Camera'),
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildTextField(nameController, 'Name'),
-            SizedBox(height: 10),
-            _buildTextField(locationController, 'Location'),
-            SizedBox(height: 10),
-            _buildTextField(gatewayController, 'Gateway'),
-            SizedBox(height: 10),
-            _buildTextField(groupController, 'Group'),
-            SizedBox(height: 10),
-            _buildTextField(
-                staticUrlListController, 'Static URL (comma-separated)'),
-            SizedBox(height: 20),
-            _buildSaveButton(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField(TextEditingController controller, String label) {
-    bool isRequired = label == 'Name' ||
-        label == 'Gateway' ||
-        label == 'Static URL (comma-separated)';
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: isRequired ? '$label*' : label,
-        labelStyle: TextStyle(color: isRequired ? Colors.red : null),
-        border: OutlineInputBorder(),
-      ),
-    );
-  }
-
-  Widget _buildSaveButton() {
-    return ElevatedButton(
-      onPressed: () {
-        // Save the camera information and navigate back to the previous page
-        String name = nameController.text;
-        String location = locationController.text;
-        String gateway = gatewayController.text;
-        String group = groupController.text;
-        String cameraID = cameraIDController.text;
-        String streamID = streamIDController.text;
-        String staticUrls = staticUrlListController.text;
-
-        List<String> staticUrlList = staticUrls.split(",");
-
-        Bilgi newCamera = Bilgi(
-          name,
-          name,
-          location,
-          gateway,
-          group,
-          cameraID,
-          streamID,
-          staticUrlList,
-          '',
-          [],
-          [],
-          [],
-        );
-
-        // Pass the newCamera back to the previous page
-        Navigator.pop(context, newCamera);
-      },
-      style: ElevatedButton.styleFrom(
-        padding: EdgeInsets.symmetric(vertical: 20.0),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-      ),
-      child: Text('Save'),
-    );
-  }
-}
-
 class RtspPlayerPage extends StatefulWidget {
   final String rtspUrl;
 
@@ -955,36 +895,33 @@ class RtspPlayerPageState extends State<RtspPlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('RTSP Player')),
-      body: Center(
-        // Use Stack to overlay the player with the loading indicator
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            GestureDetector(
-              // Wrap VlcPlayer with GestureDetector to handle gestures
-              onScaleUpdate: (ScaleUpdateDetails details) {
-                setState(() {
-                  // Update the scale factor on each scale update
-                  _scale = details.scale;
-                });
-              },
-              child: Transform.scale(
-                // Apply the scale factor to the VlcPlayer using Transform.scale
-                scale: _scale,
-                child: VlcPlayer(
-                  controller: _controller,
-                  aspectRatio: 16 / 9, // Or your preferred aspect ratio
-                  placeholder:
-                      Container(), // Use an empty container as placeholder
-                ),
+    return Center(
+      // Use Stack to overlay the player with the loading indicator
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          GestureDetector(
+            // Wrap VlcPlayer with GestureDetector to handle gestures
+            onScaleUpdate: (ScaleUpdateDetails details) {
+              setState(() {
+                // Update the scale factor on each scale update
+                _scale = details.scale;
+              });
+            },
+            child: Transform.scale(
+              // Apply the scale factor to the VlcPlayer using Transform.scale
+              scale: _scale,
+              child: VlcPlayer(
+                controller: _controller,
+                aspectRatio: 16 / 9, // Or your preferred aspect ratio
+                placeholder:
+                    Container(), // Use an empty container as placeholder
               ),
             ),
-            // Show CircularProgressIndicator when loading
-            if (_isLoading) CircularProgressIndicator(),
-          ],
-        ),
+          ),
+          // Show CircularProgressIndicator when loading
+          if (_isLoading) CircularProgressIndicator(),
+        ],
       ),
     );
   }
@@ -993,5 +930,121 @@ class RtspPlayerPageState extends State<RtspPlayerPage> {
   void dispose() {
     super.dispose();
     _controller.dispose();
+  }
+}
+
+class CameraGridPage extends StatefulWidget {
+  final List<Bilgi> selectedCameras;
+
+  CameraGridPage({required this.selectedCameras});
+
+  @override
+  CameraGridPageState createState() => CameraGridPageState();
+}
+
+class CameraGridPageState extends State<CameraGridPage> {
+  int _expandedCameraIndex = -1;
+
+  @override
+  Widget build(BuildContext context) {
+    List<Widget> cameraWidgets = [];
+
+    for (int index = 0; index < widget.selectedCameras.length; index++) {
+      final selectedCamera = widget.selectedCameras[index];
+      final rtspUrl = selectedCamera.staticUrlList[0];
+
+      cameraWidgets.add(GestureDetector(
+        onTap: () {
+          setState(() {
+            if (_expandedCameraIndex == index) {
+              _expandedCameraIndex = -1;
+            } else {
+              _expandedCameraIndex = index;
+            }
+          });
+        },
+        child: Column(
+          children: [
+            SizedBox(
+              height: 160,
+              child: RtspPlayerPage(rtspUrl: rtspUrl),
+            ),
+            Text(
+              selectedCamera.name,
+              style: TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold),
+            ),
+            if (_expandedCameraIndex == index)
+              SizedBox(
+                height: 160,
+                child: RtspPlayerPage(rtspUrl: rtspUrl),
+              ),
+            SizedBox(height: 5), // Optional spacing between items
+          ],
+        ),
+      ));
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Camera Grid'),
+      ),
+      body: Column(
+        children: cameraWidgets,
+      ),
+    );
+  }
+}
+
+class CameraSelectionPage extends StatefulWidget {
+  final List<Bilgi> availableCameras;
+
+  CameraSelectionPage({required this.availableCameras});
+
+  @override
+  CameraSelectionPageState createState() => CameraSelectionPageState();
+}
+
+class CameraSelectionPageState extends State<CameraSelectionPage> {
+  List<Bilgi> selectedCameras = [];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Select Cameras'),
+      ),
+      body: ListView.builder(
+        itemCount: widget.availableCameras.length,
+        itemBuilder: (BuildContext context, int index) {
+          final camera = widget.availableCameras[index];
+          final isSelected = selectedCameras.contains(camera);
+          final canSelect = selectedCameras.length < 4;
+
+          return ListTile(
+            title: Text(camera.name),
+            trailing: isSelected
+                ? Icon(Icons.check_circle, color: Colors.green)
+                : canSelect
+                    ? Icon(Icons.check_circle_outline)
+                    : Icon(Icons.block),
+            onTap: () {
+              setState(() {
+                if (isSelected) {
+                  selectedCameras.remove(camera);
+                } else if (canSelect) {
+                  selectedCameras.add(camera);
+                }
+              });
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.pop(context, selectedCameras);
+        },
+        child: Icon(Icons.check),
+      ),
+    );
   }
 }
