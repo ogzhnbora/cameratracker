@@ -4,6 +4,7 @@ import 'bilgi.dart';
 import 'kamera_page.dart';
 import 'ayarlar_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,9 +17,14 @@ void main() async {
   currentIp = savedIp;
   currentPort = savedPort;
 
-  runApp(MyApp(
-    bilgiler: [],
-  ));
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: MyApp(
+        bilgiler: [],
+      ),
+    ),
+  );
 }
 
 String currentIp = "10.5.5.0";
@@ -50,6 +56,25 @@ Color getStatusColor(String status) {
   }
 }
 
+class ThemeProvider extends ChangeNotifier {
+  bool _isDarkMode = false; // Başlangıçta varsayılan tema ayarı
+
+  bool get isDarkMode => _isDarkMode;
+
+  Future<void> loadSavedTheme() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    _isDarkMode = prefs.getBool('isDarkMode') ?? false;
+    notifyListeners();
+  }
+
+  Future<void> toggleTheme() async {
+    _isDarkMode = !_isDarkMode;
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setBool('isDarkMode', _isDarkMode);
+    notifyListeners();
+  }
+}
+
 class MyApp extends StatefulWidget {
   final List<Bilgi> bilgiler;
 
@@ -70,6 +95,12 @@ class MyAppState extends State<MyApp> {
     Liveview(),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    Provider.of<ThemeProvider>(context, listen: false).loadSavedTheme();
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -80,28 +111,37 @@ class MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sparse Technology',
-      theme: ThemeData.dark(),
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        brightness: Provider.of<ThemeProvider>(context).isDarkMode
+            ? Brightness.dark
+            : Brightness.light,
+      ),
       home: Scaffold(
         body: _widgetOptions.elementAt(_selectedIndex),
-        bottomNavigationBar: BottomNavigationBar(
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.camera_alt),
-              label: 'Cameras',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings),
-              label: 'Settings',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.tv),
-              label: 'LiveView',
-            ),
-          ],
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-        ),
+        bottomNavigationBar: navigationbar(),
       ),
+    );
+  }
+
+  BottomNavigationBar navigationbar() {
+    return BottomNavigationBar(
+      items: const <BottomNavigationBarItem>[
+        BottomNavigationBarItem(
+          icon: Icon(Icons.camera_alt),
+          label: 'Cameras',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.settings),
+          label: 'Settings',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.tv),
+          label: 'LiveView',
+        ),
+      ],
+      currentIndex: _selectedIndex,
+      onTap: _onItemTapped,
     );
   }
 }

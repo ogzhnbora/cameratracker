@@ -4,13 +4,12 @@ import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 class AyarlarSayfasi extends StatefulWidget {
   @override
   AyarlarSayfasiState createState() => AyarlarSayfasiState();
 }
-
-bool isDarkMode = false;
 
 class AyarlarSayfasiState extends State<AyarlarSayfasi> {
   late TextEditingController ipController;
@@ -21,6 +20,56 @@ class AyarlarSayfasiState extends State<AyarlarSayfasi> {
     super.initState();
     ipController = TextEditingController(text: currentIp);
     portController = TextEditingController(text: currentPort.toString());
+  }
+
+  void _showThemeDialog(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Select Theme'),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile(
+                title: Text('Light Theme'),
+                value: Brightness.light,
+                groupValue: themeProvider.isDarkMode
+                    ? Brightness.dark
+                    : Brightness.light,
+                onChanged: (value) {
+                  _selectTheme(context, value!);
+                  Navigator.pop(context);
+                },
+              ),
+              RadioListTile(
+                title: Text('Dark Theme'),
+                value: Brightness.dark,
+                groupValue: themeProvider.isDarkMode
+                    ? Brightness.dark
+                    : Brightness.light,
+                onChanged: (value) {
+                  _selectTheme(context, value!);
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _selectTheme(BuildContext context, Brightness brightness) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    if ((brightness == Brightness.light && themeProvider.isDarkMode) ||
+        (brightness == Brightness.dark && !themeProvider.isDarkMode)) {
+      themeProvider.toggleTheme();
+    }
   }
 
   void scanQRCode() async {
@@ -73,7 +122,7 @@ class AyarlarSayfasiState extends State<AyarlarSayfasi> {
                 'IP and Port Number',
                 style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 10),
+              SizedBox(height: 15),
               TextField(
                 controller: ipController,
                 decoration: InputDecoration(
@@ -117,6 +166,26 @@ class AyarlarSayfasiState extends State<AyarlarSayfasi> {
                   ),
                 ],
               ),
+              SizedBox(
+                height: 20,
+              ),
+              Text(
+                'Theme',
+                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(
+                height: 10,
+              ),
+              Row(
+                children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      _showThemeDialog(context); // Tema seçim diyalogunu göster
+                    },
+                    child: Text('Change Theme'),
+                  ),
+                ],
+              )
             ],
           ),
         ),

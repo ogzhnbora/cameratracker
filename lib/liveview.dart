@@ -14,7 +14,9 @@ class _LiveviewState extends State<Liveview> {
           title: Text("Liveview"),
           centerTitle: true,
         ),
-        body: Container(),
+        body: Center(
+            child: Text("Coming Soon...",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
       ),
     );
   }
